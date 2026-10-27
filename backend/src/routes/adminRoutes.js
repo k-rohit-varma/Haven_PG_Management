@@ -1,0 +1,22 @@
+import { Router } from 'express';
+import { authenticate, authorize } from '../middleware/authenticate.js';
+import * as admin from '../controllers/adminController.js';
+import * as finance from '../controllers/rentPaymentController.js';
+import { paymentQuerySchema, rentQuerySchema, validate as validateFinance } from '../validators/rentPaymentValidators.js';
+import { adminHostelQuerySchema, adminRoomQuerySchema, adminStayParamsSchema, adminUserParamsSchema, adminUserQuerySchema, auditQuerySchema, createOwnerSchema, financialCorrectionSchema, restoreParamsSchema, restoreSchema, userRoleSchema, userStatusSchema, validateAdmin } from '../validators/adminValidators.js';
+
+const router = Router();
+router.use(authenticate, authorize('ADMIN'));
+router.get('/summary', admin.summary);
+router.get('/users', validateAdmin(adminUserQuerySchema, 'query'), admin.users);
+router.post('/users/owners', validateAdmin(createOwnerSchema), admin.createOwner);
+router.patch('/users/:userId/status', validateAdmin(adminUserParamsSchema, 'params'), validateAdmin(userStatusSchema), admin.userStatus);
+router.patch('/users/:userId/role', validateAdmin(adminUserParamsSchema, 'params'), validateAdmin(userRoleSchema), admin.userRole);
+router.get('/hostels', validateAdmin(adminHostelQuerySchema, 'query'), admin.hostels);
+router.get('/rooms', validateAdmin(adminRoomQuerySchema, 'query'), admin.rooms);
+router.get('/payments', validateFinance(paymentQuerySchema, 'query'), finance.listPayments);
+router.get('/rent-dues', validateFinance(rentQuerySchema, 'query'), finance.listDues);
+router.get('/audit-logs', validateAdmin(auditQuerySchema, 'query'), admin.auditLogs);
+router.patch('/stays/:stayId/financial-terms', validateAdmin(adminStayParamsSchema, 'params'), validateAdmin(financialCorrectionSchema), admin.financialCorrection);
+router.post('/records/:entityType/:entityId/restore', validateAdmin(restoreParamsSchema, 'params'), validateAdmin(restoreSchema), admin.restore);
+export default router;

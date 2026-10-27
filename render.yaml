@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: haven-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start -w backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: JOB_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+staticSites:
+  - name: haven-web
+    buildCommand: npm install && npm run build -w frontend
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

@@ -1,0 +1,57 @@
+import { randomUUID } from 'node:crypto';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import { env } from './config/environment.js';
+import authRoutes from './routes/authRoutes.js';
+import propertyRoutes from './routes/propertyRoutes.js';
+import roomRoutes from './routes/roomRoutes.js';
+import applicationRoutes from './routes/applicationRoutes.js';
+import stayRoutes from './routes/stayRoutes.js';
+import rentDueRoutes from './routes/rentDueRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import jobRoutes from './routes/jobRoutes.js';
+import rentChangeRoutes from './routes/rentChangeRoutes.js';
+import roomChangeRoutes from './routes/roomChangeRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import { health } from './controllers/healthController.js';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { logger } from './utils/logger.js';
+
+const app = express();
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  req.id = req.get('x-request-id')?.slice(0, 100) || randomUUID();
+  req.startedAt = Date.now();
+  res.set('X-Request-ID', req.id);
+  res.on('finish', () => {
+    const route = `${req.baseUrl || ''}${req.route?.path || req.path}`;
+    logger.info({ event: 'http_request', operation: `${req.method} ${route}`, requestId: req.id, method: req.method, route, statusCode: res.statusCode, durationMs: Date.now() - req.startedAt, userId: req.user?._id?.toString(), role: req.user?.role });
+  });
+  next();
+});
+app.use(helmet());
+app.use(cors({ origin: env.CLIENT_URL, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-ID'] }));
+app.use(express.json({ limit: '100kb' }));
+app.use(cookieParser(env.COOKIE_SECRET));
+app.get('/health', health);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/hostels', propertyRoutes);
+app.use('/api/v1/rooms', roomRoutes);
+app.use('/api/v1/tenant-applications', applicationRoutes);
+app.use('/api/v1/stays', stayRoutes);
+app.use('/api/v1/rent-dues', rentDueRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/jobs', jobRoutes);
+app.use('/api/v1/rent-change-requests', rentChangeRoutes);
+app.use('/api/v1/room-change-requests', roomChangeRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/dashboards', dashboardRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use(notFound);
+app.use(errorHandler);
+
+export default app;
