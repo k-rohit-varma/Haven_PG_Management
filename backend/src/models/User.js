@@ -4,6 +4,8 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 100 },
   email: { type: String, lowercase: true, trim: true, default: undefined, maxlength: 254 },
   phone: { type: String, trim: true, default: undefined, match: /^\+91[6-9]\d{9}$/ },
+  emergencyContact: { type: String, trim: true, maxlength: 100, default: '' },
+  notes: { type: String, trim: true, maxlength: 2000, default: '' },
   passwordHash: { type: String, required: true, select: false },
   role: { type: String, enum: ['ADMIN', 'OWNER', 'TENANT'], default: 'TENANT', immutable: true },
   isSystemAdmin: { type: Boolean, default: false, select: false },

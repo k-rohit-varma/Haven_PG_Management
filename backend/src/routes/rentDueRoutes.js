@@ -5,7 +5,6 @@ import { rentDueParamsSchema, rentQuerySchema, validate } from '../validators/re
 
 const router = Router();
 router.use(authenticate);
-router.get('/my', authorize('TENANT'), validate(rentQuerySchema, 'query'), controller.listDues);
 router.get('/summary', validate(rentQuerySchema, 'query'), controller.rentSummary);
 router.get('/hostels/:hostelId', authorize('OWNER', 'ADMIN'), (req, _res, next) => { req.query.hostelId = req.params.hostelId; next(); }, validate(rentQuerySchema, 'query'), controller.listDues);
 router.get('/', authorize('OWNER', 'ADMIN'), validate(rentQuerySchema, 'query'), controller.listDues);

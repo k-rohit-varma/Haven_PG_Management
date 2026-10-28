@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, BedDouble, Building2, ChevronDown, ClipboardList, CreditCard, LayoutDashboard, LogOut, Menu, TrendingUp, Users, WalletCards, X, Check, Sun, Moon } from 'lucide-react';
+import { Bell, Building2, ChevronDown, LayoutDashboard, LogOut, Menu, Users, WalletCards, X, Check, Sun, Moon, ClipboardList } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useAuth } from '../../features/auth/AuthContext.jsx';
 import { useToast } from '../common/ToastContext.jsx';
@@ -8,29 +8,16 @@ import { useToast } from '../common/ToastContext.jsx';
 const ownerNav = [
   { label: 'Overview', to: '/', icon: LayoutDashboard },
   { label: 'My properties', to: '/hostels', icon: Building2 },
-  { label: 'Residents', to: '/residents', icon: Users },
-  { label: 'Applications', to: '/applications', icon: ClipboardList },
-  { label: 'Rent & payments', to: '/payments', icon: CreditCard },
-  { label: 'Rent changes', to: '/rent-changes', icon: TrendingUp },
-  { label: 'Room changes', to: '/room-changes', icon: BedDouble },
-  { label: 'Deposits', to: '/deposits', icon: WalletCards },
-];
-const tenantNav = [
-  { label: 'Available hostels', to: '/hostels', icon: Building2 },
-  { label: 'My application', to: '/applications', icon: ClipboardList },
-  { label: 'My stay', to: '/residents', icon: Users },
-  { label: 'Rent & payments', to: '/payments', icon: CreditCard },
-  { label: 'Rent changes', to: '/rent-changes', icon: TrendingUp },
-  { label: 'Room changes', to: '/room-changes', icon: BedDouble },
+  { label: 'Tenants', to: '/tenants', icon: Users },
+  { label: 'Payments', to: '/payments', icon: LayoutDashboard },
   { label: 'Deposits', to: '/deposits', icon: WalletCards },
 ];
 const adminNav = [
   { label: 'Overview', to: '/', icon: LayoutDashboard },
   { label: 'Admin workspace', to: '/admin', icon: Users },
   { label: 'Hostels', to: '/hostels', icon: Building2 },
-  { label: 'Payments', to: '/payments', icon: CreditCard },
-  { label: 'Rent changes', to: '/rent-changes', icon: TrendingUp },
-  { label: 'Room changes', to: '/room-changes', icon: BedDouble },
+  { label: 'Tenants', to: '/tenants', icon: Users },
+  { label: 'Payments', to: '/payments', icon: LayoutDashboard },
   { label: 'Deposits', to: '/deposits', icon: WalletCards },
   { label: 'Audit logs', to: '/admin/audit', icon: ClipboardList },
 ];
@@ -50,8 +37,8 @@ export default function AppLayout() {
   const firstName = user?.name?.split(' ')[0] || 'there';
   const initials = user?.name?.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase() || 'PG';
   const today = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(new Date());
-  const navigation = user?.role === 'TENANT' ? tenantNav : user?.role === 'ADMIN' ? adminNav : ownerNav;
-  const workspaceName = user?.role === 'TENANT' ? 'Tenant account' : user?.role === 'ADMIN' ? 'Admin workspace' : 'Owner workspace';
+  const navigation = user?.role === 'ADMIN' ? adminNav : ownerNav;
+  const workspaceName = user?.role === 'ADMIN' ? 'Admin workspace' : 'Owner workspace';
 
   useEffect(() => {
     api.get('/notifications').then(({ data }) => setUnreadCount(data.data.unreadCount)).catch(() => setUnreadCount(0));
@@ -102,7 +89,7 @@ export default function AppLayout() {
     <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
       <div className="brand"><span className="brand-mark"><Building2 size={20} strokeWidth={2.2} /></span><span>haven<span className="brand-period">.</span><small>PROPERTY CARE</small></span><button className="mobile-close icon-button" aria-label="Close menu" onClick={() => setMobileOpen(false)}><X size={19} /></button></div>
       <div className="workspace-label">WORKSPACE</div>
-      <button className="workspace-switch"><span className="workspace-emoji">⌂</span><span><b>{user?.role === 'TENANT' ? 'My Haven' : user?.role === 'ADMIN' ? 'All properties' : 'My properties'}</b><small>{workspaceName}</small></span><ChevronDown size={15} /></button>
+      <button className="workspace-switch"><span className="workspace-emoji">⌂</span><span><b>{user?.role === 'ADMIN' ? 'All properties' : 'My properties'}</b><small>{workspaceName}</small></span><ChevronDown size={15} /></button>
       <div className="nav-label">MANAGE</div>
       <nav className="main-nav">{navigation.map(({ label, to, icon: Icon, count }) => <NavLink key={to} to={to} end={to === '/' || to === '/admin'} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{count && <span className="nav-count">{count}</span>}</NavLink>)}</nav>
       <div className="sidebar-spacer" />

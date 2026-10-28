@@ -13,7 +13,7 @@ import { TenantApplication } from '../src/models/TenantApplication.js';
 import { User } from '../src/models/User.js';
 import * as admin from '../src/services/adminService.js';
 import * as property from '../src/services/propertyService.js';
-import * as stays from '../src/services/stayService.js';
+import * as tenants from '../src/services/tenantService.js';
 
 const uri = process.env.TEST_ADMIN_MONGODB_URI;
 
@@ -43,8 +43,8 @@ test('admin status changes, audited corrections, and allowlisted record restorat
   await property.updateHostel(owner, String(hostel._id), { isActive: true });
   await property.updateRoom(owner, String(room._id), { isActive: true, reason: 'Reactivate restored test room' });
 
-  const application = await stays.createApplication(tenant, String(hostel._id));
-  const stay = await stays.approveAndAssign(owner, String(application._id), { roomId: String(room._id), moveInDate: '2024-01-31', agreedMonthlyRentPaise: 120000, securityDepositPaise: 0 });
+  const assignment = await tenants.createTenant(owner, { name: 'Assigned Admin Tenant', phone: '9876543212', gender: 'FEMALE', hostelId: String(hostel._id), roomId: String(room._id), moveInDate: '2024-01-31', agreedMonthlyRentPaise: 120000, securityDepositPaise: 0 }, 'req-assign-tenant');
+  const stay = assignment.stay;
   const correction = await admin.correctStayFinancials(administrator, String(stay._id), { agreedMonthlyRentPaise: 130000, depositAdjustmentPaise: 50000, reason: 'Corrected agreed amount and reconciled deposit receipt' }, 'req-financial-correction');
   assert.equal(correction.before.agreedMonthlyRentPaise, 120000);
   assert.equal(correction.after.nextMonthlyRentPaise, 130000);

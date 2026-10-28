@@ -19,5 +19,7 @@ api.interceptors.request.use(async (config) => {
 });
 
 export function getErrorMessage(error) {
-  return error.response?.data?.error?.message || 'Something went wrong. Please try again.';
+  const body = error.response?.data;
+  const message = body?.error?.message || 'Something went wrong. Please try again.';
+  return body?.requestId ? `${message} (Reference: ${body.requestId})` : message;
 }

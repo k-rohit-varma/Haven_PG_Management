@@ -6,5 +6,4 @@ import { dashboardQuerySchema, validate } from '../validators/rentPaymentValidat
 const router = Router();
 router.use(authenticate);
 router.get('/owner', authorize('OWNER', 'ADMIN'), validate(dashboardQuerySchema, 'query'), controller.owner);
-router.get('/tenant', authorize('TENANT'), controller.tenant);
 export default router;

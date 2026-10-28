@@ -10,7 +10,6 @@ const router = Router();
 const hostelParams = z.object({ hostelId: z.string().regex(/^[a-f\d]{24}$/i) }).strict();
 
 router.use(authenticate);
-router.get('/my', authorize('TENANT'), validate(stayPaginationSchema, 'query'), controller.myStays);
 router.get('/owner', authorize('OWNER', 'ADMIN'), validate(stayPaginationSchema, 'query'), controller.ownerStays);
 router.get('/tenants/:tenantId', authorize('OWNER', 'ADMIN'), validate(tenantParamsSchema, 'params'), validate(stayPaginationSchema, 'query'), controller.tenantStays);
 router.get('/hostels/:hostelId', authorize('OWNER', 'ADMIN'), validate(hostelParams, 'params'), validate(stayPaginationSchema, 'query'), controller.hostelStays);

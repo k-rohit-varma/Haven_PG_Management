@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "create-initial-admin": "node src/scripts/createInitialAdmin.js",
     "migrate-application-uniqueness": "node src/scripts/migrateApplicationUniqueness.js",
+    "migrate-stay-application-link": "node src/scripts/migrateStayApplicationLink.js",
     "lint": "find src tests -name '*.js' -print0 | xargs -0 -n1 node --check",
     "test": "node --test"
   },

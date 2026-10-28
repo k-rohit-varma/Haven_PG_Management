@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import { AppError } from '../errors/AppError.js';
 import { AuditLog } from '../models/AuditLog.js';
-import { notifyOnce } from './notificationWriter.js';
 import { Hostel } from '../models/Hostel.js';
 import { Payment } from '../models/Payment.js';
 import { RentDue } from '../models/RentDue.js';
@@ -73,15 +72,11 @@ export async function generateRentDues(now = new Date()) {
 }
 
 function filtersFor(user, query) {
-  return { ...(user.role === 'TENANT' ? { tenantId: user._id } : {}), ...(query.hostelId ? { hostelId: query.hostelId } : {}), ...(query.status ? { status: query.status } : {}), ...(query.month ? { billingPeriod: new RegExp(`^${query.month}`) } : {}) };
+  return { ...(query.hostelId ? { hostelId: query.hostelId } : {}), ...(query.status ? { status: query.status } : {}), ...(query.month ? { billingPeriod: new RegExp(`^${query.month}`) } : {}) };
 }
 
 export async function listRentDues(user, query) {
   let filter = filtersFor(user, query);
-  if (user.role === 'TENANT') {
-    const blocked = await Hostel.find({ isBlocked: true }).select('_id').lean();
-    filter.hostelId = { $nin: blocked.map(({ _id }) => _id), ...(query.hostelId ? { $eq: query.hostelId } : {}) };
-  }
   if (user.role === 'OWNER') {
     const hostels = await Hostel.find({ ...ownerScope(user), isBlocked: { $ne: true }, ...(query.hostelId ? { _id: query.hostelId } : {}) }).select('_id').lean();
     if (query.hostelId && !hostels.length) throw new AppError(404, 'Hostel not found.', 'HOSTEL_NOT_FOUND');
@@ -107,17 +102,13 @@ export async function listRentDues(user, query) {
 
 export async function getRentDue(user, rentDueId) {
   const due = await RentDue.findById(rentDueId).populate('tenantId', 'name email').populate('stayId', 'agreedMonthlyRentPaise moveInDate').populate('hostelId', 'name city').populate('roomId', 'identifier').lean();
-  if (!due || (user.role === 'TENANT' && String(due.tenantId?._id) !== String(user._id)) || (user.role === 'OWNER' && !await Hostel.exists({ _id: due.hostelId?._id || due.hostelId, ownerId: user._id }))) throw new AppError(404, 'Rent due not found.', 'RENT_DUE_NOT_FOUND');
+  if (!due || (user.role === 'OWNER' && !await Hostel.exists({ _id: due.hostelId?._id || due.hostelId, ownerId: user._id }))) throw new AppError(404, 'Rent due not found.', 'RENT_DUE_NOT_FOUND');
   if (user.role !== 'ADMIN' && await Hostel.exists({ _id: due.hostelId?._id || due.hostelId, isBlocked: true })) throw new AppError(423, 'This hostel is blocked. Rent records are temporarily unavailable.', 'HOSTEL_BLOCKED');
   return { ...due, outstandingPaise: Math.max(0, due.amountDuePaise - due.amountSettledPaise) };
 }
 
 export async function getRentSummary(user, query) {
-  let filter = { ...(user.role === 'TENANT' ? { tenantId: user._id } : {}), ...(query.hostelId ? { hostelId: query.hostelId } : {}), ...(query.month ? { billingPeriod: new RegExp(`^${query.month}`) } : {}) };
-  if (user.role === 'TENANT') {
-    const blocked = await Hostel.find({ isBlocked: true }).select('_id').lean();
-    filter.hostelId = { $nin: blocked.map(({ _id }) => _id), ...(query.hostelId ? { $eq: query.hostelId } : {}) };
-  }
+  let filter = { ...(query.hostelId ? { hostelId: query.hostelId } : {}), ...(query.month ? { billingPeriod: new RegExp(`^${query.month}`) } : {}) };
   if (user.role === 'OWNER') {
     const hostels = await Hostel.find({ ...ownerScope(user), isBlocked: { $ne: true }, ...(query.hostelId ? { _id: query.hostelId } : {}) }).select('_id').lean();
     if (query.hostelId && !hostels.length) throw new AppError(404, 'Hostel not found.', 'HOSTEL_NOT_FOUND');
@@ -131,41 +122,45 @@ async function transaction(work) {
   const session = await mongoose.startSession();
   try { let result; await session.withTransaction(async () => { result = await work(session); }); return result; }
   catch (error) {
-    if (error.code === 11000) throw new AppError(409, 'A pending payment request already exists for this rent due.', 'PENDING_PAYMENT_EXISTS');
+    if (error.code === 11000) throw new AppError(409, 'This payment conflicts with an existing record. Refresh and retry.', 'PAYMENT_CONFLICT');
     if (error.code === 20 || error.codeName === 'IllegalOperation' || /Transaction numbers are only allowed|replica set/i.test(error.message)) throw new AppError(503, 'This workflow requires MongoDB transaction support.', 'TRANSACTIONS_UNAVAILABLE');
     throw error;
   } finally { await session.endSession(); }
 }
 
-export async function submitPayment(user, input) {
+export async function recordPayment(user, input) {
+  if (!['OWNER', 'ADMIN'].includes(user.role)) throw new AppError(403, 'Only an owner or admin can record rent payments.', 'FORBIDDEN');
   if (input.paidOn > dayInKolkata(new Date())) throw new AppError(422, 'Payment date cannot be in the future.', 'INVALID_PAYMENT_DATE');
   return transaction(async (session) => {
-    const due = await RentDue.findOne({ _id: input.rentDueId, tenantId: user._id }).session(session);
+    const due = await RentDue.findById(input.rentDueId).session(session);
     if (!due) throw new AppError(404, 'Rent due not found.', 'RENT_DUE_NOT_FOUND');
-    if (await Hostel.exists({ _id: due.hostelId, isBlocked: true }).session(session)) throw new AppError(423, 'This hostel is blocked. Payment actions are temporarily unavailable.', 'HOSTEL_BLOCKED');
-    const updated = await RentDue.updateOne({ _id: due._id, __v: due.__v }, { $inc: { __v: 1 } }, { session });
-    if (!updated.modifiedCount) throw new AppError(409, 'Rent due changed. Refresh and try again.', 'CONCURRENT_UPDATE');
-    if (await Payment.exists({ rentDueId: due._id, status: 'PENDING' }).session(session)) throw new AppError(409, 'You already have a pending request for this rent due.', 'PENDING_PAYMENT_EXISTS');
+    const hostel = await Hostel.findOne({ _id: due.hostelId, ...ownerScope(user) }).session(session);
+    if (!hostel) throw new AppError(404, 'Rent due not found.', 'RENT_DUE_NOT_FOUND');
+    if (hostel.isBlocked) throw new AppError(423, 'This hostel is blocked. Payments cannot be recorded.', 'HOSTEL_BLOCKED');
+    const locked = await RentDue.updateOne({ _id: due._id, __v: due.__v }, { $inc: { __v: 1 } }, { session });
+    if (!locked.modifiedCount) throw new AppError(409, 'The rent balance changed. Refresh and retry.', 'CONCURRENT_UPDATE');
     const outstanding = due.amountDuePaise - due.amountSettledPaise;
-    if (outstanding <= 0) throw new AppError(409, 'This rent due is already settled.', 'RENT_DUE_SETTLED');
+    if (outstanding <= 0) throw new AppError(409, 'This rent period is already paid.', 'RENT_DUE_SETTLED');
     if (input.amountPaise > outstanding) throw new AppError(422, 'Payment cannot exceed the outstanding balance.', 'PAYMENT_EXCEEDS_BALANCE');
+    const now = new Date();
     const [payment] = await Payment.create([{
-      tenantId: user._id, stayId: due.stayId, rentDueId: due._id, hostelId: due.hostelId,
+      tenantId: due.tenantId, stayId: due.stayId, rentDueId: due._id, hostelId: due.hostelId,
       amountPaise: input.amountPaise, paidOn: parseLocalDate(input.paidOn), method: input.method,
-      transactionReference: input.transactionReference || '',
-      events: [{ fromStatus: null, toStatus: 'PENDING', actorId: user._id, note: 'Payment submitted for verification' }],
+      transactionReference: input.transactionReference || '', status: 'APPROVED', decisionMakerId: user._id, decidedAt: now,
+      events: [{ fromStatus: null, toStatus: 'APPROVED', actorId: user._id, note: 'Payment recorded by management' }],
     }], { session });
-    await RentDue.updateOne({ _id: due._id }, { $set: { status: 'PAYMENT_PENDING' } }, { session });
+    const settled = due.amountSettledPaise + input.amountPaise;
+    const remaining = due.amountDuePaise - settled;
+    const late = dayInKolkata(input.paidOn) > dayInKolkata(due.dueDate);
+    const status = remaining <= 0 ? (late ? 'PAID_LATE' : 'PAID') : settled > 0 ? 'PARTIALLY_PAID' : 'UPCOMING';
+    await RentDue.updateOne({ _id: due._id }, { $set: { amountSettledPaise: settled, lastPaymentPaidOn: parseLocalDate(input.paidOn), status } }, { session });
+    await AuditLog.create([{ actorId: user._id, action: 'PAYMENT_RECORDED', entityType: 'PAYMENT', entityId: payment._id, reason: 'Payment recorded by management', before: { amountSettledPaise: due.amountSettledPaise }, after: { amountSettledPaise: settled, amountPaise: input.amountPaise, rentStatus: status }, requestId: input.requestId || '' }], { session });
     return payment;
   });
 }
 
 export async function listPayments(user, query) {
-  let filter = { ...(user.role === 'TENANT' ? { tenantId: user._id } : {}), ...(query.status ? { status: query.status } : {}), ...(query.rentDueId ? { rentDueId: query.rentDueId } : {}) };
-  if (user.role === 'TENANT') {
-    const blocked = await Hostel.find({ isBlocked: true }).select('_id').lean();
-    filter.hostelId = { $nin: blocked.map(({ _id }) => _id) };
-  }
+  let filter = { ...(query.status ? { status: query.status } : {}), ...(query.rentDueId ? { rentDueId: query.rentDueId } : {}) };
   if (user.role === 'OWNER') {
     const hostels = await Hostel.find({ ...ownerScope(user), isBlocked: { $ne: true }, ...(query.hostelId ? { _id: query.hostelId } : {}) }).select('_id').lean();
     if (query.hostelId && !hostels.length) throw new AppError(404, 'Hostel not found.', 'HOSTEL_NOT_FOUND');
@@ -178,48 +173,9 @@ export async function listPayments(user, query) {
   return { items, pagination: pageMeta(query.page, query.limit, total) };
 }
 
-export async function decidePayment(user, paymentId, { decision, reason = '' }) {
-  return transaction(async (session) => {
-    const payment = await Payment.findById(paymentId).session(session);
-    if (!payment) throw new AppError(404, 'Payment request not found.', 'PAYMENT_NOT_FOUND');
-    const hostel = await Hostel.findOne({ _id: payment.hostelId, ...ownerScope(user) }).session(session);
-    if (!hostel) throw new AppError(404, 'Payment request not found.', 'PAYMENT_NOT_FOUND');
-    if (hostel.isBlocked && user.role !== 'ADMIN') throw new AppError(423, 'This hostel is blocked. Payment actions are temporarily unavailable.', 'HOSTEL_BLOCKED');
-    if (payment.status !== 'PENDING') throw new AppError(409, 'Only pending payment requests can be decided.', 'PAYMENT_NOT_PENDING');
-    const due = await RentDue.findById(payment.rentDueId).session(session);
-    if (!due) throw new AppError(409, 'The rent record is unavailable.', 'RENT_DUE_NOT_FOUND');
-    const lock = await RentDue.updateOne({ _id: due._id, __v: due.__v }, { $inc: { __v: 1 } }, { session });
-    if (!lock.modifiedCount) throw new AppError(409, 'The rent balance changed. Refresh and try again.', 'CONCURRENT_UPDATE');
-    if (decision === 'APPROVED' && due.amountSettledPaise + payment.amountPaise > due.amountDuePaise) throw new AppError(409, 'The approved amount would exceed the rent balance.', 'PAYMENT_EXCEEDS_BALANCE');
-    const now = new Date();
-    const updated = await Payment.updateOne({ _id: payment._id, status: 'PENDING' }, { $set: { status: decision, decisionMakerId: user._id, decidedAt: now, ...(decision === 'REJECTED' ? { rejectionReason: reason } : {}) }, $push: { events: { fromStatus: 'PENDING', toStatus: decision, actorId: user._id, at: now, note: decision === 'REJECTED' ? reason : 'Payment verified' } } }, { session });
-    if (!updated.modifiedCount) throw new AppError(409, 'The payment request was already decided.', 'PAYMENT_NOT_PENDING');
-    let settled = due.amountSettledPaise;
-    if (decision === 'APPROVED') {
-      settled += payment.amountPaise;
-      await RentDue.updateOne({ _id: due._id }, { $set: { amountSettledPaise: settled, lastPaymentPaidOn: payment.paidOn } }, { session });
-    }
-    const remaining = due.amountDuePaise - settled;
-    const pending = decision === 'REJECTED' && await Payment.exists({ rentDueId: due._id, status: 'PENDING', _id: { $ne: payment._id } }).session(session);
-    const day = dayInKolkata(now);
-    const paidLate = dayInKolkata(payment.paidOn) > dayInKolkata(due.dueDate);
-    const status = remaining <= 0 ? (paidLate ? 'PAID_LATE' : 'PAID') : (pending ? 'PAYMENT_PENDING' : settled > 0 ? 'PARTIALLY_PAID' : day > dayInKolkata(due.dueDate) ? 'OVERDUE' : 'UPCOMING');
-    await RentDue.updateOne({ _id: due._id }, { $set: { status } }, { session });
-    await AuditLog.create([{
-      actorId: user._id, action: `PAYMENT_${decision}`, entityType: 'PAYMENT', entityId: payment._id,
-      reason: decision === 'REJECTED' ? reason : 'Payment verified',
-      before: { paymentStatus: 'PENDING', amountSettledPaise: due.amountSettledPaise },
-      after: { paymentStatus: decision, amountSettledPaise: settled, rentStatus: status },
-    }], { session });
-    await notifyOnce({ recipientId: payment.tenantId, type: 'PAYMENT_DECISION', title: decision === 'APPROVED' ? 'Payment approved' : 'Payment declined', message: decision === 'APPROVED' ? 'Your rent payment was verified.' : 'Your rent payment was declined. Review the payment details.', destination: '/payments', relatedEntityId: payment._id, eventKey: `payment:${payment._id}:${decision}` }, session);
-    return Payment.findById(payment._id).session(session);
-  });
-}
-
 export async function getPayment(user, paymentId) {
   const payment = await Payment.findById(paymentId).lean();
   if (!payment) throw new AppError(404, 'Payment request not found.', 'PAYMENT_NOT_FOUND');
-  if (user.role === 'TENANT' && String(payment.tenantId) !== String(user._id)) throw new AppError(404, 'Payment request not found.', 'PAYMENT_NOT_FOUND');
   if (user.role === 'OWNER' && !await Hostel.exists({ _id: payment.hostelId, ownerId: user._id })) throw new AppError(404, 'Payment request not found.', 'PAYMENT_NOT_FOUND');
   if (user.role !== 'ADMIN' && await Hostel.exists({ _id: payment.hostelId, isBlocked: true })) throw new AppError(423, 'This hostel is blocked. Payment records are temporarily unavailable.', 'HOSTEL_BLOCKED');
   return payment;

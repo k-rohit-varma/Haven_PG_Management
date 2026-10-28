@@ -1,18 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assignStaySchema, createApplicationSchema, markLeftSchema } from '../src/validators/stayValidators.js';
-
-test('application and stay validators accept only explicit resource IDs and integer paise', () => {
-  assert.equal(createApplicationSchema.safeParse({ hostelId: '64b000000000000000000001' }).success, true);
-  assert.equal(createApplicationSchema.safeParse({ hostelId: '64b000000000000000000001', tenantId: '64b000000000000000000002' }).success, false);
-  const assignment = { roomId: '64b000000000000000000003', moveInDate: '2024-08-31', agreedMonthlyRentPaise: 850000, securityDepositPaise: 1700000 };
-  assert.equal(assignStaySchema.safeParse(assignment).success, true);
-  assert.equal(assignStaySchema.safeParse({ ...assignment, agreedMonthlyRentPaise: 850000.5 }).success, false);
-  assert.equal(assignStaySchema.safeParse({ ...assignment, moveInDate: '2024-02-30' }).success, false);
-});
+import { markLeftSchema, stayPaginationSchema } from '../src/validators/stayValidators.js';
 
 test('leaving dates require a valid date and reason is safely optional', () => {
   assert.equal(markLeftSchema.parse({ leavingDate: '2026-10-26' }).reason, '');
   assert.equal(markLeftSchema.safeParse({ leavingDate: '2025-13-01' }).success, false);
   assert.equal(markLeftSchema.safeParse({ leavingDate: '2026-10-26', status: 'LEFT' }).success, false);
+});
+
+test('resident listing validates server-side search and filter parameters', () => {
+  const query = { page: '2', limit: '25', status: 'ACTIVE', search: 'Room 4', hostelId: '64b000000000000000000001', roomId: '64b000000000000000000003', gender: 'FEMALE' };
+  assert.deepEqual(stayPaginationSchema.parse(query), { ...query, page: 2, limit: 25 });
+  assert.equal(stayPaginationSchema.safeParse({ ...query, gender: 'UNKNOWN' }).success, false);
+  assert.equal(stayPaginationSchema.safeParse({ ...query, limit: '101' }).success, false);
 });

@@ -7,6 +7,8 @@ import { User } from '../models/User.js';
 import { AppError } from '../errors/AppError.js';
 import { AuditLog } from '../models/AuditLog.js';
 import { notifyOnce } from './notificationWriter.js';
+import { currentRentPaise } from '../utils/rentTerms.js';
+import { ACTIVE_STAY_STATUS, activeRoomOccupancyStages, getOccupancyByRoom, getRoomOccupancy } from '../utils/roomOccupancy.js';
 
 const editableHostelFields = ['name', 'description', 'address', 'city', 'facilities', 'images', 'accommodationPolicy', 'contactPhone', 'isActive'];
 const editableRoomFields = ['identifier', 'sharingType', 'maxCapacity', 'genderEligibility', 'defaultRentPaise', 'facilities', 'notes', 'isActive'];
@@ -34,17 +36,8 @@ async function requireHostel(user, hostelId, { includeDeleted = false } = {}) {
   return hostel;
 }
 
-async function occupancyByRoom(roomIds) {
-  if (!roomIds.length) return new Map();
-  const records = await mongoose.connection.collection('stays').aggregate([
-    { $match: { roomId: { $in: roomIds }, status: 'ACTIVE' } },
-    { $group: { _id: '$roomId', count: { $sum: 1 } } },
-  ]).toArray();
-  return new Map(records.map((record) => [String(record._id), record.count]));
-}
-
 async function activeOccupants(roomId) {
-  const stays = await mongoose.connection.collection('stays').find({ roomId, status: 'ACTIVE' }, { projection: { tenantId: 1 } }).toArray();
+  const stays = await mongoose.connection.collection('stays').find({ roomId, status: ACTIVE_STAY_STATUS }, { projection: { tenantId: 1 } }).toArray();
   if (!stays.length) return [];
   return User.find({ _id: { $in: stays.map((stay) => stay.tenantId) }, isDeleted: false }).select('_id gender').lean();
 }
@@ -125,18 +118,13 @@ export async function listHostels(user, query) {
   if (user.role === 'TENANT') {
     const available = await Room.aggregate([
       { $match: { isDeleted: false, isActive: true, genderEligibility: { $in: ['ANY', ...(user.gender === 'MALE' || user.gender === 'FEMALE' ? [user.gender] : [])] } } },
-      { $lookup: { from: 'stays', let: { roomId: '$_id' }, pipeline: [
-        { $match: { $expr: { $and: [{ $eq: ['$roomId', '$$roomId'] }, { $eq: ['$status', 'ACTIVE'] }] } } },
-        { $count: 'count' },
-      ], as: 'occupancy' } },
-      { $addFields: { occupied: { $ifNull: [{ $arrayElemAt: ['$occupancy.count', 0] }, 0] } } },
-      { $addFields: { remaining: { $max: [0, { $subtract: ['$maxCapacity', '$occupied'] }] } } },
-      { $match: { remaining: { $gt: 0 } } },
-      { $group: { _id: '$hostelId', availableBeds: { $sum: '$remaining' }, activeRooms: { $sum: 1 } } },
+      ...activeRoomOccupancyStages(),
+      { $match: { availableBeds: { $gt: 0 } } },
+      { $group: { _id: '$hostelId', availableBeds: { $sum: '$availableBeds' }, activeRooms: { $sum: 1 } } },
     ]);
     const inventory = new Map(available.map((item) => [String(item._id), item]));
     // Discovery is independent of inventory: tenants must be able to inspect a
-    // property and its policies even when rooms are not configured or full.
+    // property and its policies even whe n rooms are not configured or full.
     const tenantFilter = { ...filter, ...(user.gender === 'MALE' ? { accommodationPolicy: { $in: ['MIXED', 'MALE_ONLY'] } } : {}), ...(user.gender === 'FEMALE' ? { accommodationPolicy: { $in: ['MIXED', 'FEMALE_ONLY'] } } : {}) };
     const [tenantItems, tenantTotal] = await Promise.all([
       Hostel.find(tenantFilter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).lean(),
@@ -153,7 +141,7 @@ export async function listHostels(user, query) {
   ]);
   const roomFilter = { hostelId: { $in: items.map((item) => item._id) }, isDeleted: false, isActive: true };
   const rooms = await Room.find(roomFilter).select('_id hostelId maxCapacity').lean();
-  const occupancy = await occupancyByRoom(rooms.map((room) => room._id));
+  const occupancy = await getOccupancyByRoom(rooms.map((room) => room._id));
   const availableByHostel = new Map();
   const inventoryByHostel = new Map();
   for (const room of rooms) {
@@ -173,11 +161,7 @@ export async function getHostel(user, hostelId) {
   if (user.role === 'TENANT' && !hostel.isActive) throw new AppError(404, 'Hostel not found.', 'HOSTEL_NOT_FOUND');
   const [summary] = await Room.aggregate([
     { $match: { hostelId: hostel._id, isDeleted: false, isActive: true } },
-    { $lookup: { from: 'stays', let: { roomId: '$_id' }, pipeline: [
-      { $match: { $expr: { $and: [{ $eq: ['$roomId', '$$roomId'] }, { $eq: ['$status', 'ACTIVE'] }] } } },
-      { $count: 'count' },
-    ], as: 'activeStayCounts' } },
-    { $addFields: { occupancy: { $ifNull: [{ $arrayElemAt: ['$activeStayCounts.count', 0] }, 0] } } },
+    ...activeRoomOccupancyStages(),
     { $group: { _id: null, count: { $sum: 1 }, occupancy: { $sum: '$occupancy' }, capacity: { $sum: '$maxCapacity' } } },
   ]);
   const roomSummary = { count: summary?.count || 0, occupied: summary?.occupancy || 0, capacity: summary?.capacity || 0, available: Math.max(0, (summary?.capacity || 0) - (summary?.occupancy || 0)) };
@@ -253,7 +237,7 @@ export async function updateHostel(user, hostelId, input) {
 export async function softDeleteHostel(user, hostelId, reason) {
   const hostel = await requireHostel(user, hostelId);
   const rooms = await Room.find({ hostelId, isDeleted: false }).select('_id').lean();
-  const occupancy = await occupancyByRoom(rooms.map((room) => room._id));
+  const occupancy = await getOccupancyByRoom(rooms.map((room) => room._id));
   if ([...occupancy.values()].some((count) => count > 0)) throw new AppError(409, 'A hostel with active occupants cannot be deleted. Deactivate it or close the active stays first.', 'HOSTEL_HAS_ACTIVE_STAYS');
   return withTransaction(async (session) => {
     const now = new Date();
@@ -289,11 +273,7 @@ export async function listRooms(user, hostelId, query) {
         : query.availability === 'INACTIVE' ? { isActive: false } : null;
   const pipeline = [
     { $match: match },
-    { $lookup: { from: 'stays', let: { roomId: '$_id' }, pipeline: [
-      { $match: { $expr: { $and: [{ $eq: ['$roomId', '$$roomId'] }, { $eq: ['$status', 'ACTIVE'] }] } } },
-      { $count: 'count' },
-    ], as: 'activeStayCounts' } },
-    { $addFields: { occupancy: { $ifNull: [{ $arrayElemAt: ['$activeStayCounts.count', 0] }, 0] } } },
+    ...activeRoomOccupancyStages(),
     { $addFields: { availableBeds: { $max: [0, { $subtract: ['$maxCapacity', '$occupancy'] }] } } },
     ...(query.minAvailableBeds !== undefined ? [{ $match: { availableBeds: { $gte: query.minAvailableBeds } } }] : []),
     ...(availabilityMatch ? [{ $match: availabilityMatch }] : []),
@@ -362,7 +342,7 @@ export async function updateRoom(user, roomId, input) {
 
 export async function softDeleteRoom(user, roomId, reason) {
   const room = await requireRoom(user, roomId);
-  const occupancy = await occupancyByRoom([room._id]);
+  const occupancy = await getOccupancyByRoom([room._id]);
   if ((occupancy.get(String(room._id)) || 0) > 0) throw new AppError(409, 'A room with active occupants cannot be deleted.', 'ROOM_HAS_ACTIVE_OCCUPANTS');
   return withTransaction(async (session) => {
     const hostel = await Hostel.findOne({ _id: room.hostelId, ...ownerScope(user), isDeleted: false }).session(session);
@@ -390,12 +370,15 @@ export async function getRoomDetails(user, roomId) {
   const room = await Room.findOne({ _id: roomId, isDeleted: false }).lean();
   if (!room) throw new AppError(404, 'Room not found.', 'ROOM_NOT_FOUND');
   const hostel = await requireHostel(user, room.hostelId);
-  const stays = await Stay.find({ roomId: room._id, status: 'ACTIVE' }).select('tenantId moveInDate agreedMonthlyRentPaise securityDepositPaise').populate('tenantId', user.role === 'TENANT' ? 'name' : 'name email phone').lean();
-  const occupancy = stays.length;
+  const [occupancy, stays] = await Promise.all([
+    getRoomOccupancy(room._id),
+    Stay.find({ roomId: room._id, status: ACTIVE_STAY_STATUS }).select('tenantId moveInDate agreedMonthlyRentPaise rentTerms securityDepositPaise').populate('tenantId', user.role === 'TENANT' ? 'name' : 'name email phone').lean(),
+  ]);
+  const occupantCount = occupancy?.occupancy || 0;
   const occupants = stays.filter((stay) => stay.tenantId).map((stay) => user.role === 'TENANT'
     ? { name: stay.tenantId.name }
-    : { name: stay.tenantId.name, email: stay.tenantId.email || '', phone: stay.tenantId.phone || '', moveInDate: stay.moveInDate, agreedMonthlyRentPaise: stay.agreedMonthlyRentPaise, securityDepositPaise: stay.securityDepositPaise });
-  return { room: { ...publicRoom(room, occupancy), isActive: room.isActive }, hostel: publicHostel(hostel), occupants };
+    : { name: stay.tenantId.name, email: stay.tenantId.email || '', phone: stay.tenantId.phone || '', moveInDate: stay.moveInDate, currentRentPaise: currentRentPaise(stay), securityDepositPaise: stay.securityDepositPaise });
+  return { room: { ...publicRoom(room, occupantCount), isActive: room.isActive }, hostel: publicHostel(hostel), occupants };
 }
 
 export async function validateAssignmentEligibility(hostelId, roomId, tenantId) {
@@ -406,7 +389,7 @@ export async function validateAssignmentEligibility(hostelId, roomId, tenantId) 
   ]);
   if (!hostel || !room || !tenant) throw new AppError(404, 'The selected hostel, room, or tenant was not found.', 'RESOURCE_NOT_FOUND');
   ensureTenantEligible(tenant.gender, hostel.accommodationPolicy, room.genderEligibility);
-  const occupancy = await occupancyByRoom([room._id]);
+  const occupancy = await getOccupancyByRoom([room._id]);
   const current = occupancy.get(String(room._id)) || 0;
   if (current >= room.maxCapacity) throw new AppError(409, 'This room is at capacity.', 'ROOM_FULL');
   return { hostel, room, tenant, currentOccupancy: current };

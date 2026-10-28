@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { api, getErrorMessage } from '../lib/api.js';
-import { useAuth } from '../features/auth/AuthContext.jsx';
 import { useToast } from '../components/common/ToastContext.jsx';
 
 const schema = z.object({ type: z.enum(['RECEIVED', 'REFUND', 'DEDUCTION', 'ADJUSTMENT_CREDIT', 'ADJUSTMENT_DEBIT']), amountRupees: z.string().regex(/^\d+(\.\d{1,2})?$/).refine((value) => Number(value) > 0), transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reference: z.string().trim().max(100), reason: z.string().trim().min(3).max(500) });
@@ -14,9 +13,7 @@ const date = (value) => new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', 
 const label = (value) => value.replaceAll('_', ' ').toLowerCase().replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 
 export default function DepositsPage() {
-  const { user } = useAuth();
   const { showToast } = useToast();
-  const tenant = user?.role === 'TENANT';
   const [stays, setStays] = useState([]);
   const [stayId, setStayId] = useState('');
   const [deposit, setDeposit] = useState(null);
@@ -29,7 +26,7 @@ export default function DepositsPage() {
   const load = useCallback(async (requestedStayId = stayId) => {
     setLoading(true); setError('');
     try {
-      const { data: staysResponse } = await api.get(tenant ? '/stays/my' : '/stays/owner', { params: { limit: 100 } });
+      const { data: staysResponse } = await api.get('/stays/owner', { params: { limit: 100 } });
       const availableStays = staysResponse.data.items;
       setStays(availableStays);
       const chosen = availableStays.find((stay) => stay._id === requestedStayId) || availableStays[0];
@@ -40,7 +37,7 @@ export default function DepositsPage() {
       } else setDeposit(null);
     } catch (requestError) { setError(getErrorMessage(requestError)); }
     finally { setLoading(false); }
-  }, [tenant, stayId]);
+  }, [stayId]);
   useEffect(() => { load(); }, [load]);
 
   async function submit(values) {
@@ -54,11 +51,10 @@ export default function DepositsPage() {
   }
 
   const selected = stays.find((stay) => stay._id === stayId);
-  const isOwner = ['OWNER', 'ADMIN'].includes(user?.role);
   return <div className="feature-page">
     <div className="feature-heading"><div><span className="eyebrow">SEPARATE FROM RENT</span><h1>Security deposits</h1><p>Each stay keeps its own deposit record. Deposits are never applied to rent automatically.</p></div><button className="button button-secondary" onClick={() => load(stayId)}><RefreshCw size={14} />Refresh</button></div>
     {error && <div className="feature-error" role="alert">{error}<button onClick={() => load(stayId)}>Try again</button></div>}
-    {!loading && stays.length > 0 && <div className="deposit-toolbar"><label className="filter-select-label">Stay<select value={stayId} onChange={(event) => load(event.target.value)}>{stays.map((stay) => <option key={stay._id} value={stay._id}>{tenant ? stay.hostelId?.name : `${stay.tenantId?.name} · ${stay.hostelId?.name}`} · {stay.status} · {date(stay.moveInDate)}</option>)}</select></label>{isOwner && <button className="button button-primary" onClick={() => setShowForm(true)}><WalletCards size={15} />Record transaction</button>}</div>}
+    {!loading && stays.length > 0 && <div className="deposit-toolbar"><label className="filter-select-label">Stay<select value={stayId} onChange={(event) => load(event.target.value)}>{stays.map((stay) => <option key={stay._id} value={stay._id}>{stay.tenantId?.name} · {stay.hostelId?.name} · {stay.status} · {date(stay.moveInDate)}</option>)}</select></label><button className="button button-primary" onClick={() => setShowForm(true)}><WalletCards size={15} />Record transaction</button></div>}
     {loading ? <div className="feature-loading">Loading deposit records…</div> : deposit ? <>
       <div className="stats-grid deposit-stats"><article className="stat-card"><div className="stat-top">Agreed initial deposit<span className="stat-icon lavender"><WalletCards size={17} /></span></div><div className="stat-value">{money(deposit.initialDepositPaise)}</div><div className="stat-foot">Locked in the stay agreement</div></article><article className="stat-card"><div className="stat-top">Received<span className="stat-icon green"><ArrowDownLeft size={17} /></span></div><div className="stat-value">{money(deposit.receivedPaise)}</div><div className="stat-foot">Deposit receipts recorded</div></article><article className="stat-card"><div className="stat-top">Available balance<span className="stat-icon yellow"><ArrowUpRight size={17} /></span></div><div className="stat-value">{money(deposit.balancePaise)}</div><div className="stat-foot">After explicit refunds and deductions</div></article></div>
       <section className="panel rent-panel"><div className="panel-header"><div><h2>Deposit transaction history</h2><p>{selected?.hostelId?.name}{selected?.roomId?.identifier ? ` · Room ${selected.roomId.identifier}` : ''}{selected?.tenantId?.name ? ` · ${selected.tenantId.name}` : ''}</p></div></div>

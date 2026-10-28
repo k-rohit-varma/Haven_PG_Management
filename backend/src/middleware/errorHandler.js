@@ -9,7 +9,10 @@ export function errorHandler(error, req, res, _next) {
   const known = error instanceof AppError;
   const validation = error.name === 'ValidationError' || error.name === 'CastError' || error instanceof SyntaxError;
   const status = known ? error.statusCode : error.code === 11000 ? 409 : validation ? 422 : 500;
-  const message = known ? error.message : error.code === 11000 ? 'A record with these details already exists.' : validation ? 'Please check the submitted information.' : 'An unexpected error occurred.';
+  const fieldErrors = error.details?.fieldErrors;
+  const firstField = fieldErrors && Object.entries(fieldErrors).find(([, messages]) => Array.isArray(messages) && messages.length);
+  const detailedValidationMessage = firstField ? `Invalid ${firstField[0]}: ${firstField[1][0]}` : null;
+  const message = known ? (error.code === 'VALIDATION_ERROR' ? detailedValidationMessage || error.message : error.message) : error.code === 11000 ? 'A record with these details already exists.' : validation ? 'Please check the submitted information.' : 'An unexpected error occurred.';
   const requestId = req.id;
   const level = status >= 500 ? 'error' : status === 403 || status === 401 ? 'warn' : 'info';
   const route = `${req.baseUrl || ''}${req.route?.path || req.path}`;

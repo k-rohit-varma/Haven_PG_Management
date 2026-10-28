@@ -19,13 +19,6 @@ export function csrfProtection(req, _res, next) {
   next();
 }
 
-export const register = asyncHandler(async (req, res) => {
-  const user = await authService.registerTenant(req.body);
-  const { token } = await authService.login({ phone: req.body.phone, password: req.body.password });
-  res.cookie('session', token, { ...sessionCookieOptions, sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax' });
-  res.status(201).json({ success: true, data: { user } });
-});
-
 export const login = asyncHandler(async (req, res) => {
   const { user, token } = await authService.login(req.body);
   res.cookie('session', token, { ...sessionCookieOptions, sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax' });

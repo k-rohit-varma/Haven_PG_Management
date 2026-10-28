@@ -15,18 +15,13 @@ export const dashboardQuerySchema = z.object({ month: monthOnly.optional() }).st
 export const paymentQuerySchema = z.object({ ...pagination, status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(), hostelId: objectId.optional(), rentDueId: objectId.optional() }).strict();
 export const rentDueParamsSchema = z.object({ rentDueId: objectId }).strict();
 export const paymentParamsSchema = z.object({ paymentId: objectId }).strict();
-export const submitPaymentSchema = z.object({
+export const recordPaymentSchema = z.object({
   rentDueId: objectId,
   amountPaise: z.number().int().min(1).max(100000000),
   paidOn: dateOnly,
   method: z.enum(['CASH', 'UPI', 'BANK_TRANSFER', 'CARD', 'OTHER']),
   transactionReference: z.string().trim().max(100).optional(),
 }).strict();
-export const paymentDecisionSchema = z.discriminatedUnion('decision', [
-  z.object({ decision: z.literal('APPROVED') }).strict(),
-  z.object({ decision: z.literal('REJECTED'), reason: z.string().trim().min(3).max(500) }).strict(),
-]);
-
 export function validate(schema, source = 'body') {
   return (req, _res, next) => {
     const parsed = schema.safeParse(req[source]);

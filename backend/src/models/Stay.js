@@ -21,7 +21,7 @@ const staySchema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel', required: true, index: true },
   roomId: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true, index: true },
-  applicationId: { type: mongoose.Schema.Types.ObjectId, ref: 'TenantApplication', required: true, unique: true },
+  applicationId: { type: mongoose.Schema.Types.ObjectId, ref: 'TenantApplication', default: null },
   moveInDate: { type: Date, required: true, immutable: true },
   leavingDate: { type: Date, default: null },
   agreedMonthlyRentPaise: { type: Number, required: true, min: 1, max: 100000000 },
@@ -39,5 +39,6 @@ staySchema.index({ tenantId: 1, status: 1 }, { unique: true, partialFilterExpres
 staySchema.index({ hostelId: 1, status: 1, moveInDate: -1 });
 staySchema.index({ roomId: 1, status: 1 });
 staySchema.index({ tenantId: 1, moveInDate: -1 });
+staySchema.index({ applicationId: 1 }, { name: 'applicationId_1_partial', unique: true, partialFilterExpression: { applicationId: { $type: 'objectId' } } });
 
 export const Stay = mongoose.model('Stay', staySchema);

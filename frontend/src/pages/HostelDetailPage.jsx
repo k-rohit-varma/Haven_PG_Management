@@ -54,8 +54,6 @@ export default function HostelDetailPage() {
   const [historyItems, setHistoryItems] = useState([]);
   const [roomDetails, setRoomDetails] = useState(null);
   const [roomDetailsError, setRoomDetailsError] = useState('');
-  const [applying, setApplying] = useState(false);
-  const [myApplication, setMyApplication] = useState(null);
   const canManage = user?.role === 'OWNER' || user?.role === 'ADMIN';
   const defaults = { sharingType: 2, maxCapacity: 2, genderEligibility: 'ANY', defaultMonthlyRent: 8000, notes: '', reason: '', isActive: true };
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(roomSchema), defaultValues: defaults });
@@ -68,13 +66,9 @@ export default function HostelDetailPage() {
       const { data } = await api.get(`/hostels/${hostelId}`);
       setHostel(data.data.hostel);
       setRoomSummary(data.data.roomSummary || { count: 0, occupied: 0, capacity: 0, available: 0 });
-      if (user?.role === 'TENANT') {
-        const apps = await api.get('/tenant-applications/my', { params: { limit: 100 } });
-        setMyApplication(apps.data.data.items.find((item) => item.hostelId?._id === hostelId) || null);
-      }
     } catch (requestError) { setError(getErrorMessage(requestError)); }
     finally { setLoading(false); }
-  }, [hostelId, user?.role]);
+  }, [hostelId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -118,17 +112,6 @@ export default function HostelDetailPage() {
       await Promise.all([load(), loadRooms()]);
       showToast('Property details updated.');
     } catch (requestError) { showToast(getErrorMessage(requestError), 'error'); }
-  }
-
-  async function applyToHostel() {
-    setApplying(true);
-    try {
-      await api.post('/tenant-applications', { hostelId });
-      setMyApplication({ status: 'PENDING' });
-      showToast('Application submitted. You can follow its status here.');
-      navigate('/applications');
-    } catch (requestError) { showToast(getErrorMessage(requestError), 'error'); }
-    finally { setApplying(false); }
   }
 
   async function toggleBlock() {
@@ -189,7 +172,7 @@ export default function HostelDetailPage() {
   function updateRoomFilter(name, value) { setRoomPage(1); setRoomFilters((current) => ({ ...current, [name]: value })); }
   function clearRoomFilters() { setRoomSearch(''); setRoomPage(1); setRoomFilters({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' }); }
   return <div className="feature-page"><Link to="/hostels" className="back-link"><ArrowLeft size={15} />Properties</Link>
-    <div className="detail-hero"><span className="detail-icon"><Building2 size={23} /></span><div className="detail-title"><span className="eyebrow">{hostel.accommodationPolicy.replaceAll('_', ' ')} · {hostel.isBlocked ? 'BLOCKED' : hostel.isActive ? 'ACTIVE LISTING' : 'INACTIVE LISTING'}</span><h1>{hostel.name}</h1><p><MapPin size={14} />{hostel.address}, {hostel.city}</p>{hostel.isBlocked && <p className="feature-error">Blocked: {hostel.blockReason || 'Access is disabled for the owner and tenants.'}</p>}</div>{canManage && <div className="detail-actions"><button className="button button-secondary" onClick={openEditHostel}><Pencil size={15} />Edit property</button>{user?.role === 'ADMIN' && <button className={hostel.isBlocked ? 'button button-primary' : 'button button-danger'} onClick={toggleBlock}><ShieldAlert size={15} />{hostel.isBlocked ? 'Unblock hostel' : 'Block hostel'}</button>}</div>}{user?.role === 'TENANT' && (myApplication ? <span className="status-badge">Application {myApplication.status.toLowerCase()}</span> : <button className="button button-primary" onClick={applyToHostel} disabled={applying}>{applying ? 'Submitting…' : 'Apply to this hostel'}</button>)}</div>
+    <div className="detail-hero"><span className="detail-icon"><Building2 size={23} /></span><div className="detail-title"><span className="eyebrow">{hostel.accommodationPolicy.replaceAll('_', ' ')} · {hostel.isBlocked ? 'BLOCKED' : hostel.isActive ? 'ACTIVE LISTING' : 'INACTIVE LISTING'}</span><h1>{hostel.name}</h1><p><MapPin size={14} />{hostel.address}, {hostel.city}</p>{hostel.isBlocked && <p className="feature-error">Blocked: {hostel.blockReason || 'Access is disabled for the owner and tenants.'}</p>}</div>{canManage && <div className="detail-actions"><button className="button button-secondary" onClick={openEditHostel}><Pencil size={15} />Edit property</button>{user?.role === 'ADMIN' && <button className={hostel.isBlocked ? 'button button-primary' : 'button button-danger'} onClick={toggleBlock}><ShieldAlert size={15} />{hostel.isBlocked ? 'Unblock hostel' : 'Block hostel'}</button>}</div>}</div>
     {hostel.facilities?.length > 0 && <div className="facility-chips">{hostel.facilities.map((facility) => <span key={facility}>{facility}</span>)}</div>}
     {hostel.description && <p className="detail-description">{hostel.description}</p>}
     <div className="detail-metrics"><article><BedDouble size={17} /><div><b>{roomSummary.count}</b><span>Active rooms</span></div></article><article><Users size={17} /><div><b>{occupied} / {capacity}</b><span>Beds occupied</span></div></article><article><Building2 size={17} /><div><b>{available}</b><span>Beds available</span></div></article></div>
@@ -219,7 +202,7 @@ export default function HostelDetailPage() {
       <div className="dialog-actions"><button type="button" className="button button-secondary" onClick={() => setDialogOpen(false)}>Cancel</button><button disabled={isSubmitting} className="button button-primary">{isSubmitting ? 'Saving…' : editingRoom ? 'Save room' : 'Add room'}</button></div>
     </form></section></div>}
     {historyRoom && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setHistoryRoom(null); }}><section className="form-dialog history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title"><button className="dialog-close" aria-label="Close history" onClick={() => setHistoryRoom(null)}>×</button><span className="eyebrow">AUDIT TRAIL</span><h2 id="history-title">Room {historyRoom.identifier} configuration</h2><p>Changes are preserved with the actor, timestamp, and previous values.</p><div className="history-list">{historyItems.map((entry) => <article key={`${entry.changedAt}-${entry._id}`}><div><b>{entry.actorId?.name || 'Account'} · {entry.actorId?.role || ''}</b><time>{entry.changedAt ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }).format(new Date(entry.changedAt)) : 'Date unavailable'}</time></div><span>{entry.reason || 'Configuration updated'}</span><small>{entry.previous?.maxCapacity ?? '—'} → {entry.next?.maxCapacity ?? '—'} beds · {money(entry.previous?.defaultRentPaise || 0)} → {money(entry.next?.defaultRentPaise || 0)} per bed</small></article>)}</div></section></div>}
-    {(roomDetails || roomDetailsError) && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setRoomDetails(null); setRoomDetailsError(''); } }}><section className="form-dialog" role="dialog" aria-modal="true" aria-labelledby="room-details-title"><button className="dialog-close" aria-label="Close room details" onClick={() => { setRoomDetails(null); setRoomDetailsError(''); }}>×</button>{roomDetailsError ? <div className="feature-error" role="alert">{roomDetailsError}</div> : roomDetails && <><span className="eyebrow">{roomDetails.hostel.name}</span><h2 id="room-details-title">Room {roomDetails.room.identifier}</h2><p>{eligibilityLabel(roomDetails.room.genderEligibility)} · {roomDetails.room.occupancy} occupied · {roomDetails.room.availableBeds} available</p><h3>Current occupants</h3>{roomDetails.occupants.length ? <div className="history-list">{roomDetails.occupants.map((occupant, index) => <article key={`${occupant.name}-${index}`}><b>{occupant.name}</b>{user?.role !== 'TENANT' && <><span>{occupant.email} · {occupant.phone}</span><small>Moved in {occupant.moveInDate ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' }).format(new Date(occupant.moveInDate)) : '—'} · Agreed rent {money(occupant.agreedMonthlyRentPaise || 0)} · Deposit {money(occupant.securityDepositPaise || 0)}</small></>}</article>)}</div> : <p>No active occupants.</p>}</>}</section></div>}
+    {(roomDetails || roomDetailsError) && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setRoomDetails(null); setRoomDetailsError(''); } }}><section className="form-dialog" role="dialog" aria-modal="true" aria-labelledby="room-details-title"><button className="dialog-close" aria-label="Close room details" onClick={() => { setRoomDetails(null); setRoomDetailsError(''); }}>×</button>{roomDetailsError ? <div className="feature-error" role="alert">{roomDetailsError}</div> : roomDetails && <><span className="eyebrow">{roomDetails.hostel.name}</span><h2 id="room-details-title">Room {roomDetails.room.identifier}</h2><p>{eligibilityLabel(roomDetails.room.genderEligibility)} · {roomDetails.room.occupancy} occupied · {roomDetails.room.availableBeds} available</p><h3>Current occupants</h3>{roomDetails.occupants.length ? <div className="history-list">{roomDetails.occupants.map((occupant, index) => <article key={`${occupant.name}-${index}`}><b>{occupant.name}</b>{user?.role !== 'TENANT' && <><span>{occupant.email} · {occupant.phone}</span><small>Moved in {occupant.moveInDate ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' }).format(new Date(occupant.moveInDate)) : '—'} · Agreed rent {money(occupant.currentRentPaise || 0)} · Deposit {money(occupant.securityDepositPaise || 0)}</small></>}</article>)}</div> : <p>No active occupants.</p>}</>}</section></div>}
     {hostelDialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setHostelDialogOpen(false); }}><section className="form-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-hostel-title"><button className="dialog-close" aria-label="Close dialog" onClick={() => setHostelDialogOpen(false)}>×</button><span className="eyebrow">PROPERTY DETAILS</span><h2 id="edit-hostel-title">Edit {hostel.name}</h2><p>Policy changes are checked against all room configurations.</p><form onSubmit={hostelForm.handleSubmit(saveHostel)} className="stacked-form">
       <label>Property name<input {...hostelForm.register('name')} />{hostelForm.formState.errors.name && <small>{hostelForm.formState.errors.name.message}</small>}</label>
       <label>Street address<input {...hostelForm.register('address')} />{hostelForm.formState.errors.address && <small>{hostelForm.formState.errors.address.message}</small>}</label>

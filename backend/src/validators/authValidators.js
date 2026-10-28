@@ -2,18 +2,7 @@ import { z } from 'zod';
 import { AppError } from '../errors/AppError.js';
 import { normalizeIndianPhone } from '../utils/phoneNumbers.js';
 
-const indianPhone = z.string().trim().transform((value, ctx) => {
-  const phone = normalizeIndianPhone(value);
-  if (!phone) ctx.addIssue({ code: 'custom', message: 'Enter a valid 10-digit Indian mobile number.' });
-  return phone;
-});
 const email = z.string().trim().email().max(254).transform((value) => value.toLowerCase());
-const password = z.string().min(10).max(72).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/);
-
-export const registerSchema = z.object({
-  name: z.string().trim().min(2).max(100), phone: indianPhone, password,
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).default('PREFER_NOT_TO_SAY'),
-}).strict();
 
 export const loginSchema = z.object({
   phone: z.string().trim().min(1).max(40).optional(),

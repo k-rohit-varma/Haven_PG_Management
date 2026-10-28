@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, ArrowRight, BedDouble, Building2, ClipboardList, CreditCard, Users, WalletCards } from 'lucide-react';
+import { Activity, ArrowRight, BedDouble, Building2, CreditCard, Users, WalletCards } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api.js';
 
@@ -15,8 +15,8 @@ export default function AdminOverviewPage() {
   const stats = [
     ['Registered users', summary.users, Users], ['Administrators', summary.userRoles.ADMIN, Users], ['Owners', summary.userRoles.OWNER, Users], ['Tenants', summary.userRoles.TENANT, Users],
     ['Hostels', summary.hostels, Building2], ['Rooms', summary.rooms, BedDouble], ['Active stays', summary.activeStays, Activity],
-    ['Vacant capacity', summary.vacantCapacity, BedDouble], ['Pending applications', summary.pendingApplications, ClipboardList],
-    ['Pending payments', summary.pendingPayments, CreditCard], ['Outstanding rent', money(summary.outstandingPaise), WalletCards],
+    ['Vacant capacity', summary.vacantCapacity, BedDouble],
+    ['Legacy pending payment records', summary.pendingPayments, CreditCard], ['Outstanding rent', money(summary.outstandingPaise), WalletCards],
     ['Overdue dues', summary.overdueDueCount, WalletCards], ['Overdue balance', money(summary.overduePaise), WalletCards],
   ];
   return <div className="feature-page admin-page"><div className="feature-heading"><div><span className="eyebrow">SYSTEM OVERVIEW</span><h1>Overview</h1><p>Live counts and recent activity across the whole service.</p></div><button className="button button-secondary" onClick={load}>Refresh</button></div>

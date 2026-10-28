@@ -12,6 +12,7 @@ export async function authenticate(req, _res, next) {
     catch { throw new AppError(401, 'Your session has expired. Please sign in again.', 'INVALID_SESSION'); }
     const user = await User.findOne({ _id: payload.sub, isActive: true, isDeleted: false });
     if (!user) throw new AppError(401, 'Your account is unavailable.', 'ACCOUNT_UNAVAILABLE');
+    if (!['ADMIN', 'OWNER'].includes(user.role)) throw new AppError(401, 'Tenant records cannot sign in. Contact an owner or administrator for account support.', 'AUTHENTICATION_DISABLED');
     req.user = user;
     next();
   } catch (error) { next(error); }
