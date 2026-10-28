@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AppError } from '../errors/AppError.js';
+export { parseLocalDate } from '../utils/dateOnly.js';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i);
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
@@ -41,8 +42,4 @@ export function validate(schema, source = 'body') {
     req[source] = parsed.data;
     next();
   };
-}
-
-export function parseLocalDate(dateOnlyValue) {
-  return new Date(`${dateOnlyValue}T00:00:00+05:30`);
 }

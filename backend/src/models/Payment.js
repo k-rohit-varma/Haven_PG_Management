@@ -17,6 +17,7 @@ const paymentSchema = new mongoose.Schema({
   paidOn: { type: Date, required: true },
   method: { type: String, enum: ['CASH', 'UPI', 'BANK_TRANSFER', 'CARD', 'OTHER'], required: true },
   transactionReference: { type: String, trim: true, maxlength: 100, default: '' },
+  idempotencyKey: { type: String, trim: true, default: null },
   status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], required: true, default: 'PENDING' },
   submittedAt: { type: Date, required: true, default: Date.now },
   decisionMakerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -26,6 +27,7 @@ const paymentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 paymentSchema.index({ rentDueId: 1 }, { unique: true, partialFilterExpression: { status: 'PENDING' } });
+paymentSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
 paymentSchema.index({ hostelId: 1, status: 1, submittedAt: -1 });
 paymentSchema.index({ tenantId: 1, submittedAt: -1 });
 export const Payment = mongoose.model('Payment', paymentSchema);

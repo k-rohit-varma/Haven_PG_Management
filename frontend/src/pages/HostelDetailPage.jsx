@@ -12,8 +12,8 @@ import Pagination from '../components/common/Pagination.jsx';
 
 const roomSchema = z.object({
   identifier: z.string().trim().min(1, 'Enter a room number.'),
-  sharingType: z.coerce.number().int().min(1).max(12),
-  maxCapacity: z.coerce.number().int().min(1).max(12),
+  sharingType: z.coerce.number().int().min(1).max(20),
+  maxCapacity: z.coerce.number().int().min(1).max(20),
   genderEligibility: z.enum(['ANY', 'MALE', 'FEMALE']),
   defaultMonthlyRent: z.coerce.number().min(0).max(1000000),
   notes: z.string().max(500),
@@ -42,6 +42,7 @@ export default function HostelDetailPage() {
   const [roomSearch, setRoomSearch] = useState('');
   const debouncedRoomSearch = useDebouncedValue(roomSearch.trim());
   const [roomFilters, setRoomFilters] = useState({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' });
+  const [draftRoomFilters, setDraftRoomFilters] = useState({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' });
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [roomsError, setRoomsError] = useState('');
   const roomRequestSequence = useRef(0);
@@ -56,7 +57,7 @@ export default function HostelDetailPage() {
   const [roomDetailsError, setRoomDetailsError] = useState('');
   const canManage = user?.role === 'OWNER' || user?.role === 'ADMIN';
   const defaults = { sharingType: 2, maxCapacity: 2, genderEligibility: 'ANY', defaultMonthlyRent: 8000, notes: '', reason: '', isActive: true };
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(roomSchema), defaultValues: defaults });
+  const { register, handleSubmit, reset, setValue, getValues, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(roomSchema), defaultValues: defaults });
   const hostelForm = useForm({ resolver: zodResolver(hostelSchema) });
 
   const load = useCallback(async () => {
@@ -169,8 +170,15 @@ export default function HostelDetailPage() {
   const available = roomSummary.available;
   const capacity = roomSummary.capacity;
   const occupied = roomSummary.occupied;
-  function updateRoomFilter(name, value) { setRoomPage(1); setRoomFilters((current) => ({ ...current, [name]: value })); }
-  function clearRoomFilters() { setRoomSearch(''); setRoomPage(1); setRoomFilters({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' }); }
+  function updateRoomFilter(name, value) {
+    setDraftRoomFilters((current) => ({ ...current, [name]: value }));
+    if (name === 'sortBy' || name === 'limit') {
+      setRoomPage(1);
+      setRoomFilters((current) => ({ ...current, [name]: value }));
+    }
+  }
+  function applyRoomFilters() { setRoomPage(1); setRoomFilters((current) => ({ ...current, ...draftRoomFilters })); }
+  function clearRoomFilters() { const empty = { genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' }; setRoomSearch(''); setRoomPage(1); setDraftRoomFilters(empty); setRoomFilters(empty); }
   return <div className="feature-page"><Link to="/hostels" className="back-link"><ArrowLeft size={15} />Properties</Link>
     <div className="detail-hero"><span className="detail-icon"><Building2 size={23} /></span><div className="detail-title"><span className="eyebrow">{hostel.accommodationPolicy.replaceAll('_', ' ')} · {hostel.isBlocked ? 'BLOCKED' : hostel.isActive ? 'ACTIVE LISTING' : 'INACTIVE LISTING'}</span><h1>{hostel.name}</h1><p><MapPin size={14} />{hostel.address}, {hostel.city}</p>{hostel.isBlocked && <p className="feature-error">Blocked: {hostel.blockReason || 'Access is disabled for the owner and tenants.'}</p>}</div>{canManage && <div className="detail-actions"><button className="button button-secondary" onClick={openEditHostel}><Pencil size={15} />Edit property</button>{user?.role === 'ADMIN' && <button className={hostel.isBlocked ? 'button button-primary' : 'button button-danger'} onClick={toggleBlock}><ShieldAlert size={15} />{hostel.isBlocked ? 'Unblock hostel' : 'Block hostel'}</button>}</div>}</div>
     {hostel.facilities?.length > 0 && <div className="facility-chips">{hostel.facilities.map((facility) => <span key={facility}>{facility}</span>)}</div>}
@@ -178,14 +186,15 @@ export default function HostelDetailPage() {
     <div className="detail-metrics"><article><BedDouble size={17} /><div><b>{roomSummary.count}</b><span>Active rooms</span></div></article><article><Users size={17} /><div><b>{occupied} / {capacity}</b><span>Beds occupied</span></div></article><article><Building2 size={17} /><div><b>{available}</b><span>Beds available</span></div></article></div>
     <div className="section-heading"><div><h2>Rooms</h2><p>Room capacity and default rent for future stays</p></div>{canManage && <button className="button button-secondary" onClick={openNewRoom}><Plus size={15} />Add room</button>}</div>
     <div className="room-filter-panel" aria-label="Room filters">
+      <p className="room-filter-hint">Search, sorting and page size update independently. Other filter changes apply when you select Apply Filters.</p>
       <div className="room-filter-row"><label className="room-search"><span>Search room</span><div><Search size={15} /><input type="search" value={roomSearch} onChange={(event) => { setRoomPage(1); setRoomSearch(event.target.value); }} placeholder="Room number or name" /></div></label>
-        <label>Gender eligibility<select value={roomFilters.genderEligibility} onChange={(event) => updateRoomFilter('genderEligibility', event.target.value)}><option value="">All eligibility</option><option value="MALE">Male only</option><option value="FEMALE">Female only</option><option value="ANY">Mixed / any</option></select></label>
-        <label>Sharing<select value={roomFilters.sharingType} onChange={(event) => updateRoomFilter('sharingType', event.target.value)}><option value="">Any sharing</option>{Array.from({ length: 12 }, (_, index) => index + 1).map((n) => <option key={n} value={n}>{n === 1 ? 'Single' : `${n}-sharing`}</option>)}</select></label>
-        <label>Availability<select value={roomFilters.availability} onChange={(event) => updateRoomFilter('availability', event.target.value)}><option value="">Any availability</option><option value="AVAILABLE">Available beds</option><option value="PARTIAL">Partially occupied</option><option value="FULL">Full</option><option value="INACTIVE">Inactive</option></select></label>
-        {canManage && <label>Active status<select value={roomFilters.active} onChange={(event) => updateRoomFilter('active', event.target.value)}><option value="">Active and inactive</option><option value="true">Active</option><option value="false">Inactive</option></select></label>}
+        <label>Gender eligibility<select value={draftRoomFilters.genderEligibility} onChange={(event) => updateRoomFilter('genderEligibility', event.target.value)}><option value="">All eligibility</option><option value="MALE">Male only</option><option value="FEMALE">Female only</option><option value="ANY">Mixed / any</option></select></label>
+        <label>Sharing<select value={draftRoomFilters.sharingType} onChange={(event) => updateRoomFilter('sharingType', event.target.value)}><option value="">Any sharing</option>{Array.from({ length: 20 }, (_, index) => index + 1).map((n) => <option key={n} value={n}>{n === 1 ? 'Single' : `${n}-sharing`}</option>)}</select></label>
+        <label>Availability<select value={draftRoomFilters.availability} onChange={(event) => updateRoomFilter('availability', event.target.value)}><option value="">Any availability</option><option value="AVAILABLE">Available beds</option><option value="PARTIAL">Partially occupied</option><option value="FULL">Full</option><option value="INACTIVE">Inactive</option></select></label>
+        {canManage && <label>Active status<select value={draftRoomFilters.active} onChange={(event) => updateRoomFilter('active', event.target.value)}><option value="">Active and inactive</option><option value="true">Active</option><option value="false">Inactive</option></select></label>}
       </div>
-      <div className="room-filter-row"><label>Min capacity<input type="number" min="1" max="12" value={roomFilters.minCapacity} onChange={(event) => updateRoomFilter('minCapacity', event.target.value)} /></label><label>Max capacity<input type="number" min="1" max="12" value={roomFilters.maxCapacity} onChange={(event) => updateRoomFilter('maxCapacity', event.target.value)} /></label><label>Min rent (₹)<input type="number" min="0" step="1" value={roomFilters.minRent} onChange={(event) => updateRoomFilter('minRent', event.target.value)} /></label><label>Max rent (₹)<input type="number" min="0" step="1" value={roomFilters.maxRent} onChange={(event) => updateRoomFilter('maxRent', event.target.value)} /></label><label>Min free beds<input type="number" min="0" max="12" value={roomFilters.minAvailableBeds} onChange={(event) => updateRoomFilter('minAvailableBeds', event.target.value)} /></label>
-        <label>Sort by<select value={roomFilters.sortBy} onChange={(event) => updateRoomFilter('sortBy', event.target.value)}><option value="identifier_asc">Room number ↑</option><option value="identifier_desc">Room number ↓</option><option value="rent_asc">Rent: low to high</option><option value="rent_desc">Rent: high to low</option><option value="available_desc">Most free beds</option><option value="occupancy_desc">Most occupied</option><option value="created_desc">Recently created</option></select></label><label>Page size<select value={roomFilters.limit} onChange={(event) => updateRoomFilter('limit', event.target.value)}><option value="12">12</option><option value="24">24</option><option value="48">48</option></select></label><button className="button button-secondary clear-filter-button" onClick={clearRoomFilters}>Clear filters</button>
+      <div className="room-filter-row"><label>Min capacity<input type="number" min="1" max="20" value={draftRoomFilters.minCapacity} onChange={(event) => updateRoomFilter('minCapacity', event.target.value)} /></label><label>Max capacity<input type="number" min="1" max="20" value={draftRoomFilters.maxCapacity} onChange={(event) => updateRoomFilter('maxCapacity', event.target.value)} /></label><label>Min rent (₹)<input type="number" min="0" step="1" value={draftRoomFilters.minRent} onChange={(event) => updateRoomFilter('minRent', event.target.value)} /></label><label>Max rent (₹)<input type="number" min="0" step="1" value={draftRoomFilters.maxRent} onChange={(event) => updateRoomFilter('maxRent', event.target.value)} /></label><label>Min free beds<input type="number" min="0" max="20" value={draftRoomFilters.minAvailableBeds} onChange={(event) => updateRoomFilter('minAvailableBeds', event.target.value)} /></label>
+        <label>Sort by<select value={roomFilters.sortBy} onChange={(event) => updateRoomFilter('sortBy', event.target.value)}><option value="identifier_asc">Room number ↑</option><option value="identifier_desc">Room number ↓</option><option value="rent_asc">Rent: low to high</option><option value="rent_desc">Rent: high to low</option><option value="available_desc">Most free beds</option><option value="occupancy_desc">Most occupied</option><option value="created_desc">Recently created</option></select></label><label>Page size<select value={roomFilters.limit} onChange={(event) => updateRoomFilter('limit', event.target.value)}><option value="12">12</option><option value="24">24</option><option value="48">48</option></select></label><button className="button button-primary" onClick={applyRoomFilters}>Apply Filters</button><button className="button button-secondary clear-filter-button" onClick={clearRoomFilters}>Clear filters</button>
       </div>
     </div>
     <div className="room-results-count">{roomPagination.total} matching {roomPagination.total === 1 ? 'room' : 'rooms'}</div>
@@ -194,7 +203,7 @@ export default function HostelDetailPage() {
     {!roomsLoading && <Pagination page={roomPage} pages={roomPagination.pages || 1} total={roomPagination.total} onPageChange={setRoomPage} />}
     {dialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialogOpen(false); }}><section className="form-dialog" role="dialog" aria-modal="true" aria-labelledby="create-room-title"><button className="dialog-close" aria-label="Close dialog" onClick={() => setDialogOpen(false)}>×</button><span className="eyebrow">ROOM INVENTORY</span><h2 id="create-room-title">{editingRoom ? `Edit room ${editingRoom.identifier}` : 'Add a room'}</h2><p>Default rent applies to future stays. Existing agreements are unchanged.</p><form onSubmit={handleSubmit(saveRoom)} className="stacked-form">
       <label>Room number<input {...register('identifier')} placeholder="e.g. 101" />{errors.identifier && <small>{errors.identifier.message}</small>}</label>
-      <div className="form-columns"><label>Sharing type<select {...register('sharingType')}><option value="1">Single</option><option value="2">2 sharing</option><option value="3">3 sharing</option><option value="4">4 sharing</option></select></label><label>Bed capacity<input {...register('maxCapacity')} type="number" min="1" max="12" />{errors.maxCapacity && <small>{errors.maxCapacity.message}</small>}</label></div>
+      <div className="form-columns"><label>Sharing type<select {...register('sharingType', { onChange: (event) => { const selectedSharing = Number(event.target.value); if (Number(getValues('maxCapacity')) < selectedSharing) setValue('maxCapacity', selectedSharing, { shouldDirty: true, shouldValidate: true }); } })}>{Array.from({ length: 20 }, (_, index) => index + 1).map((n) => <option key={n} value={n}>{n === 1 ? 'Single' : `${n}-sharing`}</option>)}</select></label><label>Bed capacity<input {...register('maxCapacity')} type="number" min="1" max="20" />{errors.maxCapacity && <small>{errors.maxCapacity.message}</small>}</label></div>
       <div className="form-columns"><label>Gender eligibility<select {...register('genderEligibility')}><option value="ANY">Any gender</option><option value="MALE">Male</option><option value="FEMALE">Female</option></select></label><label>Monthly rent per bed<input {...register('defaultMonthlyRent')} type="number" min="0" step="0.01" />{errors.defaultMonthlyRent && <small>{errors.defaultMonthlyRent.message}</small>}</label></div>
       {editingRoom && <label>Room status<select {...register('isActive', { setValueAs: (value) => value === 'true' })}><option value="true">Active</option><option value="false">Inactive</option></select></label>}
       {editingRoom && <label>Change reason <span className="optional-label">Optional, recorded in history</span><input {...register('reason')} placeholder="e.g. Converted for additional sharing" /></label>}

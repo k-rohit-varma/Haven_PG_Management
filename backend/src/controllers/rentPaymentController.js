@@ -2,6 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import * as service from '../services/rentPaymentService.js';
 
 export const listDues = asyncHandler(async (req, res) => res.json({ success: true, data: await service.listRentDues(req.user, req.query) }));
+export const reconcileDues = asyncHandler(async (req, res) => res.json({ success: true, data: { reconciliation: await service.reconcileRentDues(req.user) } }));
 export const getDue = asyncHandler(async (req, res) => res.json({ success: true, data: { rentDue: await service.getRentDue(req.user, req.params.rentDueId) } }));
 export const rentSummary = asyncHandler(async (req, res) => res.json({ success: true, data: { summary: await service.getRentSummary(req.user, req.query) } }));
 export const recordPayment = asyncHandler(async (req, res) => res.status(201).json({ success: true, data: { payment: await service.recordPayment(req.user, { ...req.body, requestId: req.id }) } }));

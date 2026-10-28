@@ -177,6 +177,59 @@ export async function createTenant(user, input, requestId = '') {
   }
 }
 
+export async function rejoinTenant(user, tenantId, input, requestId = '') {
+  if (!['ADMIN', 'OWNER'].includes(user.role)) throw new AppError(403, 'Only an owner or admin can rejoin a tenant.', 'FORBIDDEN');
+  const context = { operation: 'rejoinTenant', requestId, userId: String(user._id), role: user.role, tenantId: String(tenantId), hostelId: String(input.hostelId), roomId: String(input.roomId) };
+  try {
+    return await transaction(async (session) => {
+      const tenant = await requireTenant(user, tenantId, session);
+      if (await Stay.exists({ tenantId: tenant._id, status: ACTIVE_STAY_STATUS }).session(session)) throw new AppError(409, 'This tenant already has an active stay.', 'TENANT_ALREADY_ASSIGNED');
+      if (!await Stay.exists({ tenantId: tenant._id, status: 'LEFT' }).session(session)) throw new AppError(409, 'Only a tenant with a previous completed stay can rejoin.', 'TENANT_NOT_ELIGIBLE_TO_REJOIN');
+
+      setDatabaseOperation(context, 'Hostel', 'findOne');
+      const hostel = await Hostel.findOne({ _id: input.hostelId, ...ownerScope(user), isActive: true, isBlocked: { $ne: true }, isDeleted: false }).session(session);
+      if (!hostel) throw new AppError(404, 'The selected property is unavailable or not assigned to you.', 'HOSTEL_NOT_FOUND');
+      setDatabaseOperation(context, 'Room', 'findOne');
+      const room = await Room.findOne({ _id: input.roomId, hostelId: hostel._id, isActive: true, isDeleted: false }).session(session);
+      if (!room) throw new AppError(404, 'Choose an active room in this property.', 'ROOM_NOT_FOUND');
+      assertTenantEligible(tenant.gender, hostel, room);
+
+      setDatabaseOperation(context, 'Room', 'updateOne');
+      const roomLock = await Room.updateOne({ _id: room._id, __v: room.__v, isActive: true, isDeleted: false }, { $inc: { __v: 1 } }, { session });
+      if (!roomLock.modifiedCount) throw new AppError(409, 'The room configuration changed. Refresh the room list and try again.', 'ROOM_CHANGED');
+      setDatabaseOperation(context, 'Room', 'occupancyAggregate');
+      const occupancy = await getRoomOccupancy(room._id, session);
+      if (!occupancy || occupancy.availableBeds < 1) throw new AppError(409, 'This room has no available beds. Refresh the room list and choose another room.', 'ROOM_FULL', { roomId: String(room._id), capacity: room.maxCapacity, occupancy: occupancy?.occupancy ?? null, availableBeds: occupancy?.availableBeds ?? 0 });
+
+      const moveInDate = parseLocalDate(input.moveInDate);
+      const effectiveFrom = parseLocalDate(cycleDate(input.moveInDate, 1));
+      const now = new Date();
+      setDatabaseOperation(context, 'Stay', 'create');
+      const [stay] = await Stay.create([{
+        tenantId: tenant._id, hostelId: hostel._id, roomId: room._id, moveInDate,
+        agreedMonthlyRentPaise: input.agreedMonthlyRentPaise,
+        rentTerms: [{ monthlyRentPaise: input.agreedMonthlyRentPaise, effectiveFrom, actorId: user._id, reason: 'Initial agreed rent for rejoined stay' }],
+        securityDepositPaise: input.securityDepositPaise, rentCycleAnchorDay: Number(input.moveInDate.slice(-2)), status: ACTIVE_STAY_STATUS,
+        financialTermsLocked: true, termsConfirmedAt: now,
+        events: [{ fromStatus: null, toStatus: ACTIVE_STAY_STATUS, actorId: user._id, at: now, reason: 'Tenant rejoined and assigned by management' }],
+      }], { session });
+      context.stayId = String(stay._id);
+      setDatabaseOperation(context, 'User', 'updateOne');
+      await User.updateOne({ _id: tenant._id, role: 'TENANT', isDeleted: false }, { $set: { isActive: true }, $inc: { activeStayLockVersion: 1 } }, { session });
+      setDatabaseOperation(context, 'AuditLog', 'create');
+      await AuditLog.create([{
+        actorId: user._id, action: 'TENANT_REJOINED', entityType: 'USER', entityId: tenant._id,
+        reason: 'Existing tenant profile assigned to a new stay', requestId,
+        after: { tenantId: tenant._id, stayId: stay._id, hostelId: hostel._id, roomId: room._id, moveInDate, agreedMonthlyRentPaise: input.agreedMonthlyRentPaise, securityDepositPaise: input.securityDepositPaise, depositTransfer: 'NONE' },
+      }], { session });
+      return { tenant: await User.findById(tenant._id).session(session).select('name phone email gender isActive'), stay };
+    }, context);
+  } catch (error) {
+    logger.warn({ event: 'tenant_rejoin_failed', operation: 'POST /api/v1/tenants/:tenantId/rejoin', requestId, userId: String(user._id), role: user.role, tenantId: String(tenantId), hostelId: String(input.hostelId), roomId: String(input.roomId), errorCode: error.code || 'UNEXPECTED_ERROR', statusCode: error.statusCode || 500, ...(error.details ? { details: error.details } : {}) });
+    throw error;
+  }
+}
+
 export async function listTenants(user, query) {
   const hostels = await assignedHostels(user);
   let stayFilter = { hostelId: { $in: hostels } };
@@ -222,8 +275,9 @@ export async function getTenant(user, tenantId) {
   const hostels = await assignedHostels(user);
   const stays = await Stay.find({ tenantId, hostelId: { $in: hostels } }).sort({ moveInDate: -1 }).populate('hostelId', 'name city address').populate('roomId', 'identifier sharingType maxCapacity').lean();
   const stayIds = stays.map(({ _id }) => _id);
-  const [payments, deposits, audit] = await Promise.all([
-    Payment.find({ tenantId, stayId: { $in: stayIds } }).sort({ paidOn: -1 }).populate('hostelId', 'name').lean(),
+  const [payments, dues, deposits, audit] = await Promise.all([
+    Payment.find({ tenantId, stayId: { $in: stayIds } }).sort({ paidOn: -1 }).populate('hostelId', 'name').populate('rentDueId', 'billingPeriod dueDate').lean(),
+    RentDue.find({ tenantId, stayId: { $in: stayIds } }).sort({ dueDate: -1 }).populate('hostelId', 'name').populate('roomId', 'identifier').lean(),
     DepositTransaction.find({ tenantId, stayId: { $in: stayIds } }).sort({ transactionDate: -1 }).populate('actorId', 'name').lean(),
     AuditLog.find({ entityType: 'USER', entityId: tenantId }).sort({ occurredAt: -1 }).limit(100).populate('actorId', 'name').lean(),
   ]);
@@ -233,7 +287,7 @@ export async function getTenant(user, tenantId) {
     const sign = ['RECEIVED', 'ADJUSTMENT_CREDIT'].includes(item.type) ? 1 : -1;
     depositBalances.set(key, (depositBalances.get(key) || 0) + sign * item.amountPaise);
   }
-  return { tenant, stays: stays.map((stay) => ({ ...stay, currentRentPaise: currentRentPaise(stay), currentDepositPaise: depositBalances.get(String(stay._id)) || 0 })), payments, deposits, audit };
+  return { tenant, stays: stays.map((stay) => ({ ...stay, currentRentPaise: currentRentPaise(stay), currentDepositPaise: depositBalances.get(String(stay._id)) || 0 })), payments, dues: dues.map((due) => ({ ...due, outstandingPaise: Math.max(0, due.amountDuePaise - due.amountSettledPaise) })), deposits, audit };
 }
 
 export async function updateTenant(user, tenantId, input, requestId = '') {

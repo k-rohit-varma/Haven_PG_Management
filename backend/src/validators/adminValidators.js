@@ -16,10 +16,10 @@ export const adminHostelQuerySchema = z.object({ ...pagination, isActive: boolQu
 export const adminRoomQuerySchema = z.object({
   ...pagination, hostelId: objectId.optional(), isActive: boolQuery, includeDeleted: boolQuery,
   search: z.string().trim().max(30).optional(), genderEligibility: z.enum(['ANY', 'MALE', 'FEMALE']).optional(),
-  sharingType: z.coerce.number().int().min(1).max(12).optional(),
-  minCapacity: z.coerce.number().int().min(1).max(12).optional(), maxCapacity: z.coerce.number().int().min(1).max(12).optional(),
+  sharingType: z.coerce.number().int().min(1).max(20).optional(),
+  minCapacity: z.coerce.number().int().min(1).max(20).optional(), maxCapacity: z.coerce.number().int().min(1).max(20).optional(),
   minRentPaise: z.coerce.number().int().min(0).max(100000000).optional(), maxRentPaise: z.coerce.number().int().min(0).max(100000000).optional(),
-  minAvailableBeds: z.coerce.number().int().min(0).max(12).optional(), availability: z.enum(['AVAILABLE', 'PARTIAL', 'FULL', 'INACTIVE']).optional(),
+  minAvailableBeds: z.coerce.number().int().min(0).max(20).optional(), availability: z.enum(['AVAILABLE', 'PARTIAL', 'FULL', 'INACTIVE']).optional(),
   sortBy: z.enum(['identifier_asc', 'identifier_desc', 'rent_asc', 'rent_desc', 'available_desc', 'occupancy_desc', 'created_desc']).default('identifier_asc'),
 }).strict().refine((query) => query.minCapacity === undefined || query.maxCapacity === undefined || query.minCapacity <= query.maxCapacity, { path: ['maxCapacity'], message: 'Maximum capacity must be at least minimum capacity.' }).refine((query) => query.minRentPaise === undefined || query.maxRentPaise === undefined || query.minRentPaise <= query.maxRentPaise, { path: ['maxRentPaise'], message: 'Maximum rent must be at least minimum rent.' });
 export const auditQuerySchema = z.object({ ...pagination, entityType: z.enum(['USER', 'HOSTEL', 'ROOM', 'STAY', 'TENANT_APPLICATION', 'RENT_DUE', 'PAYMENT', 'RENT_CHANGE_REQUEST', 'DEPOSIT_TRANSACTION']).optional(), entityId: objectId.optional(), actorId: objectId.optional(), action: z.string().trim().max(100).optional(), from: z.coerce.date().optional(), to: z.coerce.date().optional() }).strict().refine(({ from, to }) => !from || !to || from <= to, { path: ['to'], message: 'End date must be after start date.' });

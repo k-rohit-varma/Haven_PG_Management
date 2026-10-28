@@ -29,6 +29,10 @@ export const createTenantSchema = z.object({
   hostelId: objectId, roomId: objectId, moveInDate: dateOnly,
   agreedMonthlyRentPaise: z.number().int().min(1).max(100000000), securityDepositPaise: z.number().int().min(0).max(100000000),
 }).strict();
+export const rejoinTenantSchema = z.object({
+  hostelId: objectId, roomId: objectId, moveInDate: dateOnly,
+  agreedMonthlyRentPaise: z.number().int().min(1).max(100000000), securityDepositPaise: z.number().int().min(0).max(100000000),
+}).strict();
 export const updateTenantSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(), phone: phone.optional(), email,
   emergencyContact: z.string().trim().max(100).optional(), notes: z.string().trim().max(2000).optional(),

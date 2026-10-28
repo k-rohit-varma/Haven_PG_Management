@@ -17,7 +17,7 @@ router.post('/generate-rent-dues', asyncHandler(async (req, res) => {
   const startedAt = Date.now();
   try {
     const result = await generateRentDues();
-    logger.info({ event: 'rent_due_generation_completed', operation: 'generate_rent_dues', requestId: req.id, durationMs: Date.now() - startedAt, createdCount: result.created });
+    logger.info({ event: 'rent_due_generation_completed', operation: 'generate_rent_dues', requestId: req.id, durationMs: Date.now() - startedAt, checkedCount: result.checked, createdCount: result.created, skippedCount: result.skipped });
     res.json({ success: true, data: result });
   } catch (error) {
     logger.error({ event: 'rent_due_generation_failed', operation: 'generate_rent_dues', requestId: req.id, durationMs: Date.now() - startedAt, errorName: error.name, errorMessage: error.message, ...(process.env.NODE_ENV === 'production' ? {} : { stack: error.stack }) });

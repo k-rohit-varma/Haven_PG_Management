@@ -36,10 +36,10 @@ async function requireHostel(user, hostelId, { includeDeleted = false } = {}) {
   return hostel;
 }
 
-async function activeOccupants(roomId) {
-  const stays = await mongoose.connection.collection('stays').find({ roomId, status: ACTIVE_STAY_STATUS }, { projection: { tenantId: 1 } }).toArray();
+async function activeOccupants(roomId, session) {
+  const stays = await Stay.find({ roomId, status: ACTIVE_STAY_STATUS }).select('tenantId').session(session).lean();
   if (!stays.length) return [];
-  return User.find({ _id: { $in: stays.map((stay) => stay.tenantId) }, isDeleted: false }).select('_id gender').lean();
+  return User.find({ _id: { $in: stays.map((stay) => stay.tenantId) }, isDeleted: false }).select('_id gender').session(session).lean();
 }
 
 function roomEligibleForPolicy(eligibility, policy) {
@@ -321,16 +321,16 @@ export async function updateRoom(user, roomId, input) {
   const nextEligibility = changes.genderEligibility ?? room.genderEligibility;
   if (nextSharing > nextCapacity) throw new AppError(422, 'Maximum capacity cannot be below the sharing type.', 'INVALID_ROOM_CAPACITY');
   ensureRoomPolicy(nextEligibility, hostel.accommodationPolicy);
-  const occupants = await activeOccupants(room._id);
-  if (nextCapacity < occupants.length) throw new AppError(409, `Capacity cannot be reduced below the ${occupants.length} current occupant(s).`, 'CAPACITY_BELOW_OCCUPANCY');
-  if (nextEligibility !== room.genderEligibility) {
-    const incompatible = occupants.find((tenant) => tenant.gender !== nextEligibility && nextEligibility !== 'ANY');
-    if (incompatible) throw new AppError(409, 'Room eligibility cannot change while an occupant would become ineligible.', 'ROOM_HAS_INCOMPATIBLE_OCCUPANTS');
-  }
-  if (changes.isActive === false && occupants.length) throw new AppError(409, 'A room with active occupants cannot be deactivated.', 'ROOM_HAS_ACTIVE_OCCUPANTS');
   return withTransaction(async (session) => {
     const lockedHostel = await Hostel.updateOne({ _id: hostel._id, ...ownerScope(user), isDeleted: false, __v: hostel.__v }, { $inc: { __v: 1 } }, { session });
     if (!lockedHostel.modifiedCount) throw new AppError(409, 'The hostel changed while you were editing its room. Refresh and try again.', 'CONCURRENT_UPDATE');
+    const occupants = await activeOccupants(room._id, session);
+    if (nextCapacity < occupants.length) throw new AppError(409, `Capacity cannot be reduced below the ${occupants.length} current occupant(s).`, 'CAPACITY_BELOW_OCCUPANCY');
+    if (nextEligibility !== room.genderEligibility) {
+      const incompatible = occupants.find((tenant) => tenant.gender !== nextEligibility && nextEligibility !== 'ANY');
+      if (incompatible) throw new AppError(409, 'Room eligibility cannot change while an occupant would become ineligible.', 'ROOM_HAS_INCOMPATIBLE_OCCUPANTS');
+    }
+    if (changes.isActive === false && occupants.length) throw new AppError(409, 'A room with active occupants cannot be deactivated.', 'ROOM_HAS_ACTIVE_OCCUPANTS');
     const previous = Object.fromEntries(roomSnapshotFields.map((key) => [key, room[key]]));
     const updated = await Room.findOneAndUpdate({ _id: roomId, isDeleted: false, __v: room.__v }, { $set: changes, $inc: { __v: 1 } }, { new: true, runValidators: true, session });
     if (!updated) throw new AppError(409, 'The room changed while you were editing it. Refresh and try again.', 'CONCURRENT_UPDATE');

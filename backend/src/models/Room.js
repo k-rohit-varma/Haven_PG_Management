@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 const roomSchema = new mongoose.Schema({
   hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel', required: true, index: true },
   identifier: { type: String, required: true, trim: true, uppercase: true, maxlength: 30 },
-  sharingType: { type: Number, required: true, min: 1, max: 12 },
-  maxCapacity: { type: Number, required: true, min: 1, max: 12 },
+  sharingType: { type: Number, required: true, min: 1, max: 20 },
+  maxCapacity: { type: Number, required: true, min: 1, max: 20 },
   genderEligibility: { type: String, enum: ['ANY', 'MALE', 'FEMALE'], required: true },
   defaultRentPaise: { type: Number, required: true, min: 0, max: 100000000 },
   facilities: { type: [{ type: String, trim: true, maxlength: 60 }], default: [] },

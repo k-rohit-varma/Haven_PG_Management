@@ -25,8 +25,8 @@ export const updateHostelSchema = z.object({
 
 const roomFields = {
   identifier: z.string().trim().min(1).max(30),
-  sharingType: z.number().int().min(1).max(12),
-  maxCapacity: z.number().int().min(1).max(12),
+  sharingType: z.number().int().min(1).max(20),
+  maxCapacity: z.number().int().min(1).max(20),
   genderEligibility: z.enum(['ANY', 'MALE', 'FEMALE']),
   defaultRentPaise: z.number().int().min(0).max(100000000),
   facilities: textList.default([]),
@@ -50,12 +50,12 @@ export const roomListQuerySchema = listQuerySchema.extend({
   active: z.enum(['true', 'false']).optional(),
   search: z.string().trim().max(30).optional(),
   genderEligibility: z.enum(['ANY', 'MALE', 'FEMALE']).optional(),
-  sharingType: z.coerce.number().int().min(1).max(12).optional(),
-  minCapacity: z.coerce.number().int().min(1).max(12).optional(),
-  maxCapacity: z.coerce.number().int().min(1).max(12).optional(),
+  sharingType: z.coerce.number().int().min(1).max(20).optional(),
+  minCapacity: z.coerce.number().int().min(1).max(20).optional(),
+  maxCapacity: z.coerce.number().int().min(1).max(20).optional(),
   minRentPaise: z.coerce.number().int().min(0).max(100000000).optional(),
   maxRentPaise: z.coerce.number().int().min(0).max(100000000).optional(),
-  minAvailableBeds: z.coerce.number().int().min(0).max(12).optional(),
+  minAvailableBeds: z.coerce.number().int().min(0).max(20).optional(),
   availability: z.enum(['AVAILABLE', 'PARTIAL', 'FULL', 'INACTIVE']).optional(),
   sortBy: z.enum(['identifier_asc', 'identifier_desc', 'rent_asc', 'rent_desc', 'available_desc', 'occupancy_desc', 'created_desc']).default('identifier_asc'),
 }).strict().refine((query) => query.minCapacity === undefined || query.maxCapacity === undefined || query.minCapacity <= query.maxCapacity, { path: ['maxCapacity'], message: 'Maximum capacity must be at least minimum capacity.' }).refine((query) => query.minRentPaise === undefined || query.maxRentPaise === undefined || query.minRentPaise <= query.maxRentPaise, { path: ['maxRentPaise'], message: 'Maximum rent must be at least minimum rent.' });

@@ -11,9 +11,12 @@ test('rent query validates status, month, pagination, and resource IDs', () => {
 });
 
 test('management payment records require integer paise and valid payment details', () => {
-  const valid = { rentDueId: '507f1f77bcf86cd799439011', amountPaise: 10001, paidOn: '2026-10-26', method: 'UPI' };
+  const valid = { rentDueId: '507f1f77bcf86cd799439011', idempotencyKey: '8d2a98bb-14eb-4fa9-8c73-0f07d8b6f6b3', amountPaise: 10001, paidOn: '2026-10-26', method: 'UPI' };
   assert.equal(recordPaymentSchema.parse(valid).amountPaise, 10001);
   assert.equal(recordPaymentSchema.safeParse({ ...valid, amountPaise: 1.5 }).success, false);
   assert.equal(recordPaymentSchema.safeParse({ ...valid, paidOn: '2026-02-30' }).success, false);
+  assert.equal(recordPaymentSchema.safeParse({ ...valid, idempotencyKey: 'invalid' }).success, false);
+  const { idempotencyKey, ...withoutIdempotencyKey } = valid;
+  assert.equal(recordPaymentSchema.safeParse(withoutIdempotencyKey).success, false);
   assert.equal(recordPaymentSchema.safeParse({ ...valid, transactionReference: 'x'.repeat(101) }).success, false);
 });

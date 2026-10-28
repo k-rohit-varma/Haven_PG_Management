@@ -1,0 +1,114 @@
+.payments-filterbar {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.5fr) repeat(3, minmax(130px, 1fr)) auto auto;
+  align-items: end;
+  justify-content: initial;
+  gap: 10px;
+}
+
+.payments-filterbar .search-box {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.payments-filterbar .filter-select-label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.payments-filterbar .filter-select-label select,
+.payments-filterbar .filter-select-label input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 9px;
+  border: 1px solid #e8e8ed;
+  border-radius: 7px;
+  background: white;
+  color: #555660;
+  font: inherit;
+  font-size: 10px;
+}
+
+.payments-filterbar > .button {
+  height: 36px;
+  white-space: nowrap;
+}
+
+.payments-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.payments-table-wrap table {
+  min-width: 680px;
+}
+
+.payments-table-wrap td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1050px) {
+  .payments-filterbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .payments-filterbar .search-box {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 620px) {
+  .payments-filterbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .payments-filterbar .search-box,
+  .payments-filterbar .filter-select-label {
+    grid-column: 1 / -1;
+  }
+
+  .payments-filterbar > .button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .payments-page .payments-filterbar .filter-select-label select,
+  .payments-page .payments-filterbar .filter-select-label input,
+  .payments-page .payments-filterbar .search-box input {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .rent-panel {
+    min-width: 0;
+    padding: 14px 10px;
+  }
+
+  .payments-table-wrap table {
+    min-width: 620px;
+  }
+
+  .payments-page .feature-heading {
+    flex-wrap: wrap;
+  }
+
+  .payments-page .payment-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .payments-page .payment-actions .button {
+    flex: 1 1 130px;
+  }
+}

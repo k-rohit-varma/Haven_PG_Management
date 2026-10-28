@@ -23,6 +23,11 @@ test('room creation validates whole bed counts, capacity, eligibility, and integ
   assert.equal(createRoomSchema.safeParse({ ...room, maxCapacity: 2 }).success, false);
   assert.equal(createRoomSchema.safeParse({ ...room, defaultRentPaise: 7500.25 }).success, false);
   assert.equal(createRoomSchema.safeParse({ ...room, ownerId: 'attacker' }).success, false);
+  assert.equal(createRoomSchema.safeParse({ ...room, sharingType: 20, maxCapacity: 20 }).success, true);
+  for (const invalid of [0, -1, 1.5, 21]) {
+    assert.equal(createRoomSchema.safeParse({ ...room, sharingType: invalid, maxCapacity: Math.max(1, Math.ceil(invalid)) }).success, false);
+    assert.equal(createRoomSchema.safeParse({ ...room, sharingType: 2, maxCapacity: invalid }).success, false);
+  }
 });
 
 test('updates require an explicit allowed change and reject protected ownership fields', () => {
@@ -31,6 +36,9 @@ test('updates require an explicit allowed change and reject protected ownership 
   assert.equal(updateHostelSchema.safeParse({ ownerId: 'attacker' }).success, false);
   assert.equal(updateRoomSchema.safeParse({ reason: 'only a reason' }).success, false);
   assert.equal(updateRoomSchema.safeParse({ maxCapacity: 4, reason: 'increase availability' }).success, true);
+  assert.equal(updateRoomSchema.safeParse({ sharingType: 20, maxCapacity: 20 }).success, true);
+  assert.equal(updateRoomSchema.safeParse({ maxCapacity: 21 }).success, false);
+  assert.equal(updateRoomSchema.safeParse({ sharingType: 1.5 }).success, false);
 });
 
 test('room list filters validate combined criteria, ranges, sorting, and pagination', () => {
@@ -38,6 +46,8 @@ test('room list filters validate combined criteria, ranges, sorting, and paginat
   assert.equal(filters.page, 2);
   assert.equal(filters.sharingType, 2);
   assert.equal(filters.availability, 'PARTIAL');
+  assert.equal(roomListQuerySchema.parse({ sharingType: '20', minCapacity: '20' }).sharingType, 20);
+  assert.equal(roomListQuerySchema.safeParse({ sharingType: '21' }).success, false);
   assert.equal(roomListQuerySchema.safeParse({ page: '0' }).success, false);
   assert.equal(roomListQuerySchema.safeParse({ genderEligibility: 'MIXED' }).success, false);
   assert.equal(roomListQuerySchema.safeParse({ minCapacity: '5', maxCapacity: '2' }).success, false);

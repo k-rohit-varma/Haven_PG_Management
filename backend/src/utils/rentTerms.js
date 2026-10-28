@@ -1,6 +1,5 @@
-export function dayInKolkata(value) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
-}
+import { dayInKolkata } from './dateOnly.js';
+export { dayInKolkata };
 
 export function currentRentPaise(stay, asOf = new Date()) {
   const today = dayInKolkata(asOf);

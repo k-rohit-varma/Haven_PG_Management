@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Building2, ChevronDown, LayoutDashboard, LogOut, Menu, Users, WalletCards, X, Check, Sun, Moon, ClipboardList } from 'lucide-react';
+import { Bell, Building2, ChevronDown, LayoutDashboard, LogOut, Menu, Users, X, Check, Sun, Moon, ClipboardList } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useAuth } from '../../features/auth/AuthContext.jsx';
 import { useToast } from '../common/ToastContext.jsx';
@@ -10,7 +10,6 @@ const ownerNav = [
   { label: 'My properties', to: '/hostels', icon: Building2 },
   { label: 'Tenants', to: '/tenants', icon: Users },
   { label: 'Payments', to: '/payments', icon: LayoutDashboard },
-  { label: 'Deposits', to: '/deposits', icon: WalletCards },
 ];
 const adminNav = [
   { label: 'Overview', to: '/', icon: LayoutDashboard },
@@ -18,7 +17,6 @@ const adminNav = [
   { label: 'Hostels', to: '/hostels', icon: Building2 },
   { label: 'Tenants', to: '/tenants', icon: Users },
   { label: 'Payments', to: '/payments', icon: LayoutDashboard },
-  { label: 'Deposits', to: '/deposits', icon: WalletCards },
   { label: 'Audit logs', to: '/admin/audit', icon: ClipboardList },
 ];
 

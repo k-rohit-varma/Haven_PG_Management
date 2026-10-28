@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTenantSchema, tenantListQuery, updateRentSchema, updateTenantSchema } from '../src/validators/tenantValidators.js';
+import { createTenantSchema, rejoinTenantSchema, tenantListQuery, updateRentSchema, updateTenantSchema } from '../src/validators/tenantValidators.js';
 
 const ids = { hostelId: '64b000000000000000000001', roomId: '64b000000000000000000002' };
 
@@ -19,6 +19,14 @@ test('tenant edits reject protected stay/financial fields and require an allowed
   assert.equal(updateTenantSchema.safeParse({}).success, false);
   assert.equal(updateTenantSchema.safeParse({ moveInDate: '2026-10-28' }).success, false);
   assert.equal(updateTenantSchema.safeParse({ name: 'Aditi Sharma' }).success, true);
+});
+
+test('rejoin terms validate new stay dates, room, rent, and deposit without requiring profile fields', () => {
+  const terms = { ...ids, moveInDate: '2026-10-28', agreedMonthlyRentPaise: 700000, securityDepositPaise: 1200000 };
+  assert.deepEqual(rejoinTenantSchema.parse(terms), terms);
+  assert.equal(rejoinTenantSchema.safeParse({ ...terms, moveInDate: '2026-02-30' }).success, false);
+  assert.equal(rejoinTenantSchema.safeParse({ ...terms, agreedMonthlyRentPaise: 0 }).success, false);
+  assert.equal(rejoinTenantSchema.safeParse({ ...terms, securityDepositPaise: -1 }).success, false);
 });
 
 test('tenant listing supports validated server filters and rent changes use paise and explicit dates', () => {

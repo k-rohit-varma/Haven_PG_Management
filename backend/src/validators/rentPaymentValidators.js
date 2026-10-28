@@ -12,11 +12,12 @@ const pagination = { page: z.coerce.number().int().min(1).default(1), limit: z.c
 
 export const rentQuerySchema = z.object({ ...pagination, status: z.enum(['UPCOMING', 'PAYMENT_PENDING', 'PAID', 'PAID_LATE', 'OVERDUE', 'PARTIALLY_PAID']).optional(), hostelId: objectId.optional(), month: monthOnly.optional(), search: z.string().trim().min(2).max(80).optional() }).strict();
 export const dashboardQuerySchema = z.object({ month: monthOnly.optional() }).strict();
-export const paymentQuerySchema = z.object({ ...pagination, status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(), hostelId: objectId.optional(), rentDueId: objectId.optional() }).strict();
+export const paymentQuerySchema = z.object({ ...pagination, status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(), hostelId: objectId.optional(), rentDueId: objectId.optional(), month: monthOnly.optional(), search: z.string().trim().min(2).max(80).optional() }).strict();
 export const rentDueParamsSchema = z.object({ rentDueId: objectId }).strict();
 export const paymentParamsSchema = z.object({ paymentId: objectId }).strict();
 export const recordPaymentSchema = z.object({
   rentDueId: objectId,
+  idempotencyKey: z.string().uuid(),
   amountPaise: z.number().int().min(1).max(100000000),
   paidOn: dateOnly,
   method: z.enum(['CASH', 'UPI', 'BANK_TRANSFER', 'CARD', 'OTHER']),

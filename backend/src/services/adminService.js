@@ -14,6 +14,7 @@ import { RoomConfigurationHistory } from '../models/RoomConfigurationHistory.js'
 import { parseLocalDate } from '../validators/stayValidators.js';
 import { env } from '../config/environment.js';
 import { normalizeIndianPhone } from '../utils/phoneNumbers.js';
+import { getOccupancyByRoom } from '../utils/roomOccupancy.js';
 
 const pageMeta = (page, limit, total) => ({ page, limit, total, pages: Math.ceil(total / limit) });
 const inKolkata = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
@@ -177,18 +178,30 @@ export async function setUserRole(admin, userId, input, requestId = '') {
 
 export async function getSystemSummary() {
   const today = new Date(`${inKolkata(new Date())}T00:00:00+05:30`);
-  const [userRoles, hostels, rooms, activeStays, pendingPayments, dues, overdueDues, recentActivity, roomCapacities] = await Promise.all([
+  const activeStayIds = await Stay.distinct('_id', { status: 'ACTIVE' });
+  const activeStayFilter = { stayId: { $in: activeStayIds } };
+  const [userRoles, hostels, rooms, activeStays, overdueDues, recentActivity, activeRooms] = await Promise.all([
     User.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$role', count: { $sum: 1 } } }]), Hostel.countDocuments({ isDeleted: false }), Room.countDocuments({ isDeleted: false }), Stay.countDocuments({ status: 'ACTIVE' }),
-    Payment.countDocuments({ status: 'PENDING' }),
-    RentDue.aggregate([{ $group: { _id: null, amountDuePaise: { $sum: '$amountDuePaise' }, amountSettledPaise: { $sum: '$amountSettledPaise' } } }]),
-    RentDue.aggregate([{ $match: { dueDate: { $lt: today }, $expr: { $gt: [{ $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] } } }, { $group: { _id: null, count: { $sum: 1 }, amountPaise: { $sum: { $subtract: ['$amountDuePaise', '$amountSettledPaise'] } } } }]),
-    AuditLog.find().sort({ occurredAt: -1 }).limit(8).populate('actorId', 'name role').lean(), Room.aggregate([{ $match: { isDeleted: false, isActive: true } }, { $group: { _id: null, capacity: { $sum: '$maxCapacity' } } }]),
+    RentDue.aggregate([{ $match: { ...activeStayFilter, dueDate: { $lt: today }, $expr: { $gt: [{ $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] } } }, { $group: { _id: null, count: { $sum: 1 }, amountPaise: { $sum: { $subtract: ['$amountDuePaise', '$amountSettledPaise'] } } } }]),
+    AuditLog.find().sort({ occurredAt: -1 }).limit(8).populate('actorId', 'name role').lean(), Room.find({ isDeleted: false, isActive: true }).select('_id sharingType maxCapacity').lean(),
   ]);
-  const dueTotals = dues[0] || { amountDuePaise: 0, amountSettledPaise: 0 };
+  const occupancyByRoom = await getOccupancyByRoom(activeRooms.map((room) => room._id));
+  const sharingSummary = new Map();
+  let vacantCapacity = 0;
+  let availableRooms = 0;
+  for (const room of activeRooms) {
+    const occupiedBeds = occupancyByRoom.get(String(room._id)) || 0;
+    const availableBeds = Math.max(0, room.maxCapacity - occupiedBeds);
+    vacantCapacity += availableBeds;
+    if (availableBeds > 0) availableRooms += 1;
+    const item = sharingSummary.get(room.sharingType) || { sharingType: room.sharingType, totalRooms: 0, totalCapacity: 0, occupiedBeds: 0, availableBeds: 0 };
+    item.totalRooms += 1; item.totalCapacity += room.maxCapacity; item.occupiedBeds += occupiedBeds; item.availableBeds += availableBeds;
+    sharingSummary.set(room.sharingType, item);
+  }
   const roles = Object.fromEntries(userRoles.map(({ _id, count }) => [_id, count]));
   const overdue = overdueDues[0] || { count: 0, amountPaise: 0 };
   const totalUsers = Object.values(roles).reduce((sum, value) => sum + value, 0);
-  return { users: totalUsers, userRoles: { ADMIN: roles.ADMIN || 0, OWNER: roles.OWNER || 0, TENANT: roles.TENANT || 0 }, hostels, rooms, activeStays, vacantCapacity: Math.max(0, (roomCapacities[0]?.capacity || 0) - activeStays), pendingPayments, amountDuePaise: dueTotals.amountDuePaise, amountSettledPaise: dueTotals.amountSettledPaise, outstandingPaise: Math.max(0, dueTotals.amountDuePaise - dueTotals.amountSettledPaise), overdueDueCount: overdue.count, overduePaise: overdue.amountPaise, recentActivity };
+  return { users: totalUsers, userRoles: { ADMIN: roles.ADMIN || 0, OWNER: roles.OWNER || 0, TENANT: roles.TENANT || 0 }, hostels, rooms, activeStays, availableRooms, vacantCapacity, sharingSummary: [...sharingSummary.values()].sort((a, b) => a.sharingType - b.sharingType), overdueDueCount: overdue.count, overduePaise: overdue.amountPaise, recentActivity };
 }
 
 export async function restoreRecord(admin, entityType, entityId, reason, requestId = '') {

@@ -21,7 +21,9 @@ Use HTTPS for both services because production session cookies require Secure. K
 
 The new notification `eventKey` field is optional for existing documents, so no data backfill is needed. If automatic Mongoose index creation is disabled in the deployment, apply the deduplication index once in the application database: `db.notifications.createIndex({ eventKey: 1 }, { unique: true, partialFilterExpression: { eventKey: { $type: 'string' } } })`.
 
-Configure an external scheduler to POST `https://<api-host>/api/v1/jobs/generate-rent-dues` with the `x-job-secret: <JOB_SECRET>` header. Repeated calls are idempotent. Rent generation and payment allocation use MongoDB transactions, so Atlas or another replica set is required. The endpoint returns the number of newly created dues and processed active stays.
+Configure an external scheduler to POST `https://<api-host>/api/v1/jobs/generate-rent-dues` with the `x-job-secret: <JOB_SECRET>` header. Repeated calls are idempotent. Owners and admins can also use **Reconcile dues** on the Rent & payments page to backfill missing periods for existing stays; this preserves existing dues and payments. Generation includes active stays and ended stays up to their leaving date. Rent generation and payment allocation use MongoDB transactions, so Atlas or another replica set is required. The job returns checked stays, created dues, and periods already present.
+
+Payment retries use a partial unique index on `payments.idempotencyKey`; legacy payment records without a key are unaffected. If Mongoose automatic index creation is disabled, create it once with `db.payments.createIndex({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } })`.
 
 ## Troubleshooting
 
