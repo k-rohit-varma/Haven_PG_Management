@@ -31,7 +31,7 @@ function runProtection(req) {
   return { error, nextCalled };
 }
 
-test('CSRF token uses a secure host-only cross-site cookie in production and matching header is accepted', () => {
+test('CSRF token uses a secure host-only Lax cookie in production and matching header is accepted', () => {
   let cookie;
   let body;
   csrfToken({ get: () => process.env.CLIENT_URL }, {
@@ -41,16 +41,16 @@ test('CSRF token uses a secure host-only cross-site cookie in production and mat
   assert.equal(cookie.options.signed, true);
   assert.equal(cookie.options.httpOnly, true);
   assert.equal(cookie.options.secure, true);
-  assert.equal(cookie.options.sameSite, 'none');
+  assert.equal(cookie.options.sameSite, 'lax');
   assert.equal(cookie.options.domain, undefined);
   assert.equal(body.data.csrfToken, cookie.value);
   const sessionOptions = getCookieOptions();
   assert.equal(sessionOptions.httpOnly, true);
   assert.equal(sessionOptions.secure, true);
-  assert.equal(sessionOptions.sameSite, 'none');
+  assert.equal(sessionOptions.sameSite, 'lax');
   assert.equal(sessionOptions.path, '/');
   assert.equal(sessionOptions.maxAge, cookie.options.maxAge);
-  assert.deepEqual(getClearCookieOptions(), { httpOnly: true, secure: true, sameSite: 'none', path: '/' });
+  assert.deepEqual(getClearCookieOptions(), { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
 
   const accepted = runProtection(request({ cookie: cookie.value, header: body.data.csrfToken }));
   assert.equal(accepted.error, undefined);

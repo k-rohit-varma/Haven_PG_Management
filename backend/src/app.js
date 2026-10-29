@@ -3,6 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { env } from './config/environment.js';
 import authRoutes from './routes/authRoutes.js';
 import propertyRoutes from './routes/propertyRoutes.js';
@@ -48,6 +51,14 @@ app.use('/api/v1/jobs', jobRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/dashboards', dashboardRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+const frontendDistPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
+if (existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath, { index: false }));
+  app.get('*', (req, res, next) => {
+    if (req.path === '/api' || req.path.startsWith('/api/')) return next();
+    res.sendFile(resolve(frontendDistPath, 'index.html'), (error) => { if (error) next(error); });
+  });
+}
 app.use(notFound);
 app.use(errorHandler);
 

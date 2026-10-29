@@ -1,6 +1,6 @@
 # Architecture
 
-The repository is split into independently deployable `frontend/` and `backend/` workspaces. The API is versioned under `/api/v1`.
+The repository is split into `frontend/` and `backend/` workspaces and is deployed as one web service: Express serves the built Vite app and the API is versioned under `/api/v1`.
 
 ## Backend
 
@@ -12,7 +12,7 @@ The repository is split into independently deployable `frontend/` and `backend/`
 - `middleware/`: authentication, authorization, and error handling.
 - `config/`: environment parsing and database connection.
 
-Authentication uses a signed JWT in an HttpOnly cookie. A separate signed double-submit CSRF cookie/header pair protects mutations. Cookies are host-only; production uses Secure/SameSite=None for cross-origin calls and local development uses SameSite=Lax. Browser third-party-cookie policies may still block cookies across different sites, so production frontend/API domains under the same registrable domain are recommended. The frontend sends credentials and obtains the CSRF token before the first mutation.
+Authentication uses a signed JWT in an HttpOnly cookie. A separate signed double-submit CSRF cookie/header pair protects mutations. Cookies are host-only and use SameSite=Lax; production cookies are Secure. The frontend is served from the API origin and makes relative `/api/v1` requests, avoiding third-party cookie handling. The frontend sends credentials and obtains the CSRF token before the first mutation.
 
 Sensitive multi-document workflows should use MongoDB transactions. That requires an Atlas replica set (including Atlas Free tier) or another replica-set deployment. Any fallback without transaction support must use conditional atomic updates, idempotency constraints, and documented compensation handling.
 

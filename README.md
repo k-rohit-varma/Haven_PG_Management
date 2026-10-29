@@ -48,13 +48,13 @@ Configure `ADMIN_NAME`, `ADMIN_PHONE`, and `ADMIN_PASSWORD` in `backend/.env`. T
 
 ## Authentication and security notes
 
-The signed JWT is held in an HttpOnly cookie and is never returned in JSON. Mutating auth requests require a CSRF token fetched from `/api/v1/auth/csrf`. Cookies are host-only; production requires HTTPS and uses Secure/SameSite=None for cross-origin API requests, while local development uses SameSite=Lax. `CLIENT_URL` must exactly match the frontend origin. Browsers may still block third-party cookies when frontend and API use different sites; custom domains under the same registrable domain are the most reliable setup. New tenants authenticate with their phone number; legacy email accounts remain supported. Login errors do not reveal whether the account exists. Duplicate phone registration returns a clear 409 error.
+The signed JWT is held in an HttpOnly cookie and is never returned in JSON. Mutating auth requests require a CSRF token fetched from `/api/v1/auth/csrf`. Cookies are host-only, Secure in production, and SameSite=Lax. In the Render deployment, Express serves the frontend and API from the same origin. `CLIENT_URL` must match that origin exactly. New tenants authenticate with their phone number; legacy email accounts remain supported. Login errors do not reveal whether the account exists. Duplicate phone registration returns a clear 409 error.
 
 Authorization middleware is enforced by the API. `authorize(...roles)` is available for role-specific routes. Hostel and room ownership is scoped in service queries; tenant listing serializers exclude owner and deletion metadata. Only ADMIN can create a property and must assign an eligible owner.
 
 ## Deployment
 
-See [deployment notes](docs/deployment.md). Deploy `frontend/` as a static Vite site and `backend/` as a Node web service. Configure all server environment values in the hosting provider. Set Atlas Network Access to allow the deployed service, use a database user with least privilege, and restrict CORS to the frontend URL. Render's local disk is not used for persistent data.
+See [deployment notes](docs/deployment.md). The Render Blueprint builds `frontend/` and serves it from the Express web service alongside the `/api/v1` API. Configure server environment values in the hosting provider and set `CLIENT_URL` to that same service origin. Set Atlas Network Access to allow the deployed service and use a database user with least privilege. Render's local disk is not used for persistent data.
 
 ## Detailed documentation
 
