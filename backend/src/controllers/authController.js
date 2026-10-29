@@ -6,7 +6,7 @@ import { AppError } from '../errors/AppError.js';
 import * as authService from '../services/authService.js';
 import { logger } from '../utils/logger.js';
 
-const allowedClientOrigin = new URL(env.CLIENT_URL).origin;
+const allowedClientOrigin = new URL(env.CLIENT_URL).origin || 'https://haven-pg-management-frontend.onrender.com';
 
 function rejectOrigin(req, next) {
   const origin = req.get('origin');
