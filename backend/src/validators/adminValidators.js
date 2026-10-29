@@ -27,6 +27,7 @@ export const adminUserParamsSchema = z.object({ userId: objectId }).strict();
 export const adminStayParamsSchema = z.object({ stayId: objectId }).strict();
 export const restoreParamsSchema = z.object({ entityType: z.enum(['USER', 'HOSTEL', 'ROOM']), entityId: objectId }).strict();
 export const userStatusSchema = z.object({ isActive: z.boolean(), reason: z.string().trim().min(3).max(500) }).strict();
+export const ownerPasswordSchema = z.object({ password: z.string().min(10).max(72).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/), reason: z.string().trim().min(3).max(500) }).strict();
 const identifier = z.string().trim().min(3).max(254).transform((value, ctx) => {
   if (value.includes('@')) {
     const parsed = z.string().email().max(254).safeParse(value);

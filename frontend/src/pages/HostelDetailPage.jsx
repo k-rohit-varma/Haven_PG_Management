@@ -23,7 +23,7 @@ const roomSchema = z.object({
 const hostelSchema = z.object({
   name: z.string().trim().min(2).max(120), address: z.string().trim().min(5).max(300), city: z.string().trim().min(2).max(100),
   accommodationPolicy: z.enum(['MIXED', 'MALE_ONLY', 'FEMALE_ONLY']), contactPhone: z.string().trim().max(30),
-  description: z.string().trim().max(2000), facilities: z.string().max(1000), isActive: z.boolean(),
+  description: z.string().trim().max(2000), facilities: z.string().max(1000), isActive: z.boolean(), ownerId: z.string().optional(),
 });
 
 const money = (paise) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(paise / 100);
@@ -50,6 +50,8 @@ export default function HostelDetailPage() {
   const [error, setError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [hostelDialogOpen, setHostelDialogOpen] = useState(false);
+  const [activeOwners, setActiveOwners] = useState([]);
+  const [savingHostel, setSavingHostel] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
   const [historyRoom, setHistoryRoom] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
@@ -101,18 +103,33 @@ export default function HostelDetailPage() {
     setDialogOpen(true);
   }
 
-  function openEditHostel() {
-    hostelForm.reset({ name: hostel.name, address: hostel.address, city: hostel.city, accommodationPolicy: hostel.accommodationPolicy, contactPhone: hostel.contactPhone || '', description: hostel.description || '', facilities: (hostel.facilities || []).join(', '), isActive: hostel.isActive });
+  async function openEditHostel() {
+    const ownerId = hostel.ownerId?._id || hostel.ownerId || '';
+    if (user?.role === 'ADMIN') {
+      try {
+        const { data } = await api.get('/admin/users', { params: { page: 1, limit: 100, role: 'OWNER', isActive: true } });
+        setActiveOwners(data.data.items || []);
+      } catch (requestError) { showToast(getErrorMessage(requestError), 'error'); return; }
+    }
+    hostelForm.reset({ name: hostel.name, address: hostel.address, city: hostel.city, accommodationPolicy: hostel.accommodationPolicy, contactPhone: hostel.contactPhone || '', description: hostel.description || '', facilities: (hostel.facilities || []).join(', '), isActive: hostel.isActive, ownerId });
     setHostelDialogOpen(true);
   }
 
   async function saveHostel(values) {
+    setSavingHostel(true);
     try {
-      await api.patch(`/hostels/${hostelId}`, { ...values, facilities: values.facilities.split(',').map((item) => item.trim()).filter(Boolean) });
+      const currentOwnerId = hostel.ownerId?._id || hostel.ownerId || '';
+      if (user?.role === 'ADMIN' && values.ownerId && values.ownerId !== currentOwnerId) {
+        await api.patch(`/hostels/${hostelId}/owner`, { ownerId: values.ownerId });
+      }
+      const details = { ...values };
+      delete details.ownerId;
+      await api.patch(`/hostels/${hostelId}`, { ...details, facilities: values.facilities.split(',').map((item) => item.trim()).filter(Boolean) });
       setHostelDialogOpen(false);
       await Promise.all([load(), loadRooms()]);
-      showToast('Property details updated.');
+      showToast(user?.role === 'ADMIN' && values.ownerId !== currentOwnerId ? 'Property details and owner updated.' : 'Property details updated.');
     } catch (requestError) { showToast(getErrorMessage(requestError), 'error'); }
+    finally { setSavingHostel(false); }
   }
 
   async function toggleBlock() {
@@ -219,8 +236,9 @@ export default function HostelDetailPage() {
       <label>Contact phone<input {...hostelForm.register('contactPhone')} /></label>
       <label>Facilities <span className="optional-label">Comma separated</span><input {...hostelForm.register('facilities')} placeholder="Wi-Fi, laundry, meals" /></label>
       <label>Description<textarea {...hostelForm.register('description')} rows="3" /></label>
+      {user?.role === 'ADMIN' && <label>Assigned owner<select {...hostelForm.register('ownerId')} required><option value="">Choose an active owner</option>{hostel.ownerId?._id && !activeOwners.some((owner) => owner._id === hostel.ownerId._id) && <option value={hostel.ownerId._id}>{hostel.ownerId.name} · current owner (inactive)</option>}{activeOwners.map((owner) => <option key={owner._id} value={owner._id}>{owner.name} · {owner.email || owner.phone}</option>)}</select></label>}
       <label>Listing status<select {...hostelForm.register('isActive', { setValueAs: (value) => value === 'true' })}><option value="true">Active</option><option value="false">Inactive</option></select></label>
-      <div className="dialog-actions"><button type="button" className="button button-secondary" onClick={() => setHostelDialogOpen(false)}>Cancel</button><button className="button button-primary" disabled={hostelForm.formState.isSubmitting}>{hostelForm.formState.isSubmitting ? 'Saving…' : 'Save property'}</button></div>
+      <div className="dialog-actions"><button type="button" className="button button-secondary" onClick={() => setHostelDialogOpen(false)}>Cancel</button><button className="button button-primary" disabled={hostelForm.formState.isSubmitting || savingHostel}>{hostelForm.formState.isSubmitting || savingHostel ? 'Saving…' : 'Save property'}</button></div>
     </form></section></div>}
   </div>;
 }

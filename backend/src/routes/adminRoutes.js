@@ -3,13 +3,14 @@ import { authenticate, authorize } from '../middleware/authenticate.js';
 import * as admin from '../controllers/adminController.js';
 import * as finance from '../controllers/rentPaymentController.js';
 import { paymentQuerySchema, rentQuerySchema, validate as validateFinance } from '../validators/rentPaymentValidators.js';
-import { adminHostelQuerySchema, adminRoomQuerySchema, adminStayParamsSchema, adminUserParamsSchema, adminUserQuerySchema, auditQuerySchema, createOwnerSchema, financialCorrectionSchema, restoreParamsSchema, restoreSchema, userRoleSchema, userStatusSchema, validateAdmin } from '../validators/adminValidators.js';
+import { adminHostelQuerySchema, adminRoomQuerySchema, adminStayParamsSchema, adminUserParamsSchema, adminUserQuerySchema, auditQuerySchema, createOwnerSchema, financialCorrectionSchema, ownerPasswordSchema, restoreParamsSchema, restoreSchema, userRoleSchema, userStatusSchema, validateAdmin } from '../validators/adminValidators.js';
 
 const router = Router();
 router.use(authenticate, authorize('ADMIN'));
 router.get('/summary', admin.summary);
 router.get('/users', validateAdmin(adminUserQuerySchema, 'query'), admin.users);
 router.post('/users/owners', validateAdmin(createOwnerSchema), admin.createOwner);
+router.patch('/users/:userId/password', validateAdmin(adminUserParamsSchema, 'params'), validateAdmin(ownerPasswordSchema), admin.ownerPassword);
 router.patch('/users/:userId/status', validateAdmin(adminUserParamsSchema, 'params'), validateAdmin(userStatusSchema), admin.userStatus);
 router.patch('/users/:userId/role', validateAdmin(adminUserParamsSchema, 'params'), validateAdmin(userRoleSchema), admin.userRole);
 router.get('/hostels', validateAdmin(adminHostelQuerySchema, 'query'), admin.hostels);

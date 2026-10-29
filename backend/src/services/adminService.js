@@ -58,6 +58,19 @@ export async function createOwner(admin, input, requestId = '') {
   });
 }
 
+export async function changeOwnerPassword(admin, userId, input, requestId = '') {
+  return transaction(async (session) => {
+    const owner = await User.findOne({ _id: userId, role: 'OWNER', isDeleted: false }).select('+passwordHash').session(session);
+    if (!owner) throw new AppError(404, 'Owner account not found.', 'OWNER_NOT_FOUND');
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const before = { passwordChanged: false };
+    owner.passwordHash = passwordHash;
+    await owner.save({ session });
+    await logChange(admin._id, 'OWNER_PASSWORD_CHANGED', 'USER', owner._id, input.reason, before, { passwordChanged: true }, requestId, session);
+    return User.findById(owner._id).select('name email phone role isActive').session(session);
+  });
+}
+
 export async function listHostels(query) {
   const filter = { ...(query.isActive !== undefined ? { isActive: query.isActive } : {}), ...(query.includeDeleted ? {} : { isDeleted: false }) };
   const [items, total] = await Promise.all([

@@ -3,6 +3,7 @@ import * as service from '../services/adminService.js';
 
 export const users = asyncHandler(async (req, res) => res.json({ success: true, data: await service.listUsers(req.query) }));
 export const createOwner = asyncHandler(async (req, res) => res.status(201).json({ success: true, data: { user: await service.createOwner(req.user, req.body, req.id) } }));
+export const ownerPassword = asyncHandler(async (req, res) => res.json({ success: true, data: { user: await service.changeOwnerPassword(req.user, req.params.userId, req.body, req.id) } }));
 export const summary = asyncHandler(async (_req, res) => res.json({ success: true, data: { summary: await service.getSystemSummary() } }));
 export const hostels = asyncHandler(async (req, res) => res.json({ success: true, data: await service.listHostels(req.query) }));
 export const rooms = asyncHandler(async (req, res) => res.json({ success: true, data: await service.listRooms(req.query) }));
