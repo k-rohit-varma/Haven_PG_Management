@@ -12,7 +12,7 @@ The repository is split into independently deployable `frontend/` and `backend/`
 - `middleware/`: authentication, authorization, and error handling.
 - `config/`: environment parsing and database connection.
 
-Authentication uses a signed JWT in an HttpOnly cookie. A separate double-submit CSRF cookie/header pair protects mutations. Cookies are SameSite=Lax in local development; production uses Secure/SameSite=None for separately hosted frontend and API origins. The frontend sends credentials and obtains the CSRF token before the first mutation.
+Authentication uses a signed JWT in an HttpOnly cookie. A separate signed double-submit CSRF cookie/header pair protects mutations. Cookies are SameSite=Lax; production cookies are Secure and host-only. Production frontend and API custom domains must share the same registrable domain so browsers treat credentialed frontend-to-API requests as same-site. The frontend sends credentials and obtains the CSRF token before the first mutation.
 
 Sensitive multi-document workflows should use MongoDB transactions. That requires an Atlas replica set (including Atlas Free tier) or another replica-set deployment. Any fallback without transaction support must use conditional atomic updates, idempotency constraints, and documented compensation handling.
 

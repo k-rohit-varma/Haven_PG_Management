@@ -6,7 +6,7 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   MONGODB_URI: z.string().min(1),
   JWT_SECRET: z.string().min(32),
-  CLIENT_URL: z.string().url(),
+  CLIENT_URL: z.string().url().refine((value) => new URL(value).origin === value, 'CLIENT_URL must be an origin without a path or trailing slash.'),
   COOKIE_SECRET: z.string().min(32),
   JOB_SECRET: z.string().min(32).optional(),
   LOG_LEVEL: z.string().default('info'),
