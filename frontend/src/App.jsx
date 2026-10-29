@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout.jsx';
+import GlobalLoadingIndicator from './components/common/GlobalLoadingIndicator.jsx';
 import { useAuth } from './features/auth/AuthContext.jsx';
 import RequireAuth from './routes/RequireAuth.jsx';
 
@@ -22,7 +23,7 @@ function RootRedirect() {
 }
 
 export default function App() {
-  return <Suspense fallback={<div className="loading-screen" role="status" aria-live="polite"><span className="loading-mark">haven.</span><span>Loading page…</span></div>}><Routes>
+  return <><GlobalLoadingIndicator /><Suspense fallback={<div className="loading-screen" role="status" aria-live="polite"><span className="loading-mark">haven.</span><span>Loading page…</span></div>}><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route element={<RequireAuth roles={['ADMIN', 'OWNER']} />}><Route element={<AppLayout />}>
       <Route path="/" element={<RootRedirect />} />
@@ -40,5 +41,5 @@ export default function App() {
       </Route>
     </Route></Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes></Suspense>;
+  </Routes></Suspense></>;
 }

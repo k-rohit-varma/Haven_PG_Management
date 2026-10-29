@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { beginRequestActivity, endRequestActivity } from './requestActivity.js';
 
 const apiBaseUrl = import.meta.env.PROD
   ? '/api/v1'
@@ -12,15 +13,27 @@ export const api = axios.create({
 
 let csrfToken;
 api.interceptors.request.use(async (config) => {
-  if (!['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
-    if (!csrfToken) {
-      const response = await api.get('/auth/csrf');
-      csrfToken = response.data.data.csrfToken;
+  const activityId = beginRequestActivity();
+  config.requestActivityId = activityId;
+  try {
+    if (!['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
+      if (!csrfToken) {
+        const response = await api.get('/auth/csrf');
+        csrfToken = response.data.data.csrfToken;
+      }
+      config.headers['X-CSRF-Token'] = csrfToken;
     }
-    config.headers['X-CSRF-Token'] = csrfToken;
+    return config;
+  } catch (error) {
+    endRequestActivity(activityId);
+    throw error;
   }
-  return config;
 });
+
+api.interceptors.response.use(
+  (response) => { endRequestActivity(response.config?.requestActivityId); return response; },
+  (error) => { endRequestActivity(error.config?.requestActivityId); return Promise.reject(error); },
+);
 
 export function getErrorMessage(error) {
   const body = error.response?.data;
