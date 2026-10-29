@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Activity, ArrowRight, BedDouble, Building2, CreditCard, Users, WalletCards } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Activity, BedDouble, Building2, CreditCard, Users, WalletCards } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api.js';
 
 const money = (paise) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format((paise || 0) / 100);
-const date = (value) => new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }).format(new Date(value));
 
 export default function AdminOverviewPage() {
   const [summary, setSummary] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
@@ -18,9 +16,8 @@ export default function AdminOverviewPage() {
     ['Available rooms', summary.availableRooms, Building2], ['Available beds', summary.vacantCapacity, BedDouble],
     ['Overdue dues', summary.overdueDueCount, CreditCard], ['Overdue balance', money(summary.overduePaise), WalletCards],
   ];
-  return <div className="feature-page admin-page"><div className="feature-heading"><div><span className="eyebrow">SYSTEM OVERVIEW</span><h1>Overview</h1><p>Live counts and recent activity across the whole service.</p></div><button className="button button-secondary" onClick={load}>Refresh</button></div>
+  return <div className="feature-page admin-page admin-overview-page"><div className="feature-heading"><div><span className="eyebrow">SYSTEM OVERVIEW</span><h1>Overview</h1><p>Live counts and room capacity across the whole service.</p></div><button className="button button-secondary" onClick={load}>Refresh</button></div>
     <div className="stats-grid admin-stats">{stats.map(([label, value, Icon]) => <article className="stat-card" key={label}><div className="stat-top">{label}<span className="stat-icon lavender"><Icon size={17} /></span></div><div className="stat-value">{value}</div></article>)}</div>
     <section className="panel admin-panel"><div className="panel-header"><div><h2>Capacity by sharing type</h2><p>Active rooms and occupants with active stays.</p></div></div>{summary.sharingSummary?.length ? <div className="table-wrap"><table><thead><tr><th>SHARING TYPE</th><th>ROOMS</th><th>TOTAL CAPACITY</th><th>OCCUPIED BEDS</th><th>AVAILABLE BEDS</th></tr></thead><tbody>{summary.sharingSummary.map((item) => <tr key={item.sharingType}><td>{item.sharingType}-sharing</td><td>{item.totalRooms}</td><td>{item.totalCapacity}</td><td>{item.occupiedBeds}</td><td>{item.availableBeds}</td></tr>)}</tbody></table></div> : <div className="rent-empty"><BedDouble size={18} /><b>No active rooms configured</b></div>}</section>
-    <section className="panel admin-panel"><div className="panel-header"><div><h2>Recent system activity</h2><p>Latest recorded actions from the audit history.</p></div><Link className="text-link" to="/admin/audit">Open audit log <ArrowRight size={13} /></Link></div>{summary.recentActivity.length ? <div className="audit-list">{summary.recentActivity.map((log) => <article className="audit-item" key={log._id}><div className="audit-icon"><Activity size={15} /></div><div className="audit-copy"><b>{log.action.replaceAll('_', ' ')}</b><span>{log.actorId?.name || 'System user'} ({log.actorId?.role || '—'}) · {log.entityType} · {log.entityId}</span><small>{date(log.occurredAt)} · {log.reason}</small></div></article>)}</div> : <div className="rent-empty"><Activity size={18} /><b>No recorded activity yet</b></div>}</section>
   </div>;
 }

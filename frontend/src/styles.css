@@ -72,3 +72,13 @@
 @media(max-width:600px){.feature-toolbar:not(.payments-filterbar){align-items:stretch;flex-wrap:wrap}.feature-toolbar:not(.payments-filterbar)>.search-box{flex:1 1 100%;max-width:none}.feature-toolbar:not(.payments-filterbar)>.filter-select-label{display:grid;grid-template-columns:1fr;align-content:start;gap:6px;flex:1 1 calc(50% - 8px);min-width:0}.feature-toolbar:not(.payments-filterbar)>.filter-select-label select{width:100%;min-width:0;min-height:42px;padding-inline:9px;font-size:13px}.feature-toolbar>.button{flex:1 1 120px;min-height:42px}.tenants-table-wrap{margin-inline:-2px}.tenants-table-wrap table{min-width:720px}.tenants-table-wrap td:last-child{white-space:nowrap}.feature-heading>.button{max-width:100%}.form-dialog{width:min(100%,480px);max-height:calc(100dvh - 24px);padding:22px 16px}.stacked-form,.stacked-form label,.form-columns{min-width:0}.stacked-form input,.stacked-form select,.stacked-form textarea{min-width:0}.dialog-actions{flex-wrap:wrap}.dialog-actions .button{flex:1 1 120px}}
 @media(max-width:620px){.payments-page .payments-filterbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:10px}.payments-page .payments-filterbar .search-box,.payments-page .payments-filterbar .filter-select-label{grid-column:1/-1;min-width:0}.payments-page .payments-filterbar .filter-select-label{display:grid;grid-template-columns:1fr;gap:6px}.payments-page .payments-filterbar .filter-select-label select,.payments-page .payments-filterbar .filter-select-label input,.payments-page .payments-filterbar .search-box input{width:100%;min-width:0;min-height:42px;font-size:14px}.payments-page .payments-filterbar>.button{width:100%;min-width:0;min-height:42px;padding-inline:8px;font-size:12px}}
 @media(max-width:760px){.dashboard-page .content-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Admin overview: keep the summary cards balanced across desktop and mobile. */
+.admin-overview-page .admin-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0 16px}
+.admin-overview-page .stat-card{min-width:0}
+.admin-overview-page .stat-top{align-items:flex-start;gap:10px;line-height:1.4}
+.admin-overview-page .panel{min-width:0}
+.admin-overview-page .table-wrap{max-width:100%;overflow-x:auto}
+.admin-overview-page .table-wrap table{min-width:620px}
+@media(max-width:1024px){.admin-overview-page .admin-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.admin-overview-page .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.admin-overview-page .admin-panel{padding:16px 12px}}

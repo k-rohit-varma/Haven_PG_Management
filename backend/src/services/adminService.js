@@ -180,10 +180,10 @@ export async function getSystemSummary() {
   const today = new Date(`${inKolkata(new Date())}T00:00:00+05:30`);
   const activeStayIds = await Stay.distinct('_id', { status: 'ACTIVE' });
   const activeStayFilter = { stayId: { $in: activeStayIds } };
-  const [userRoles, hostels, rooms, activeStays, overdueDues, recentActivity, activeRooms] = await Promise.all([
+  const [userRoles, hostels, rooms, activeStays, overdueDues, activeRooms] = await Promise.all([
     User.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$role', count: { $sum: 1 } } }]), Hostel.countDocuments({ isDeleted: false }), Room.countDocuments({ isDeleted: false }), Stay.countDocuments({ status: 'ACTIVE' }),
     RentDue.aggregate([{ $match: { ...activeStayFilter, dueDate: { $lt: today }, $expr: { $gt: [{ $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] } } }, { $group: { _id: null, count: { $sum: 1 }, amountPaise: { $sum: { $subtract: ['$amountDuePaise', '$amountSettledPaise'] } } } }]),
-    AuditLog.find().sort({ occurredAt: -1 }).limit(8).populate('actorId', 'name role').lean(), Room.find({ isDeleted: false, isActive: true }).select('_id sharingType maxCapacity').lean(),
+    Room.find({ isDeleted: false, isActive: true }).select('_id sharingType maxCapacity').lean(),
   ]);
   const occupancyByRoom = await getOccupancyByRoom(activeRooms.map((room) => room._id));
   const sharingSummary = new Map();
@@ -201,7 +201,7 @@ export async function getSystemSummary() {
   const roles = Object.fromEntries(userRoles.map(({ _id, count }) => [_id, count]));
   const overdue = overdueDues[0] || { count: 0, amountPaise: 0 };
   const totalUsers = Object.values(roles).reduce((sum, value) => sum + value, 0);
-  return { users: totalUsers, userRoles: { ADMIN: roles.ADMIN || 0, OWNER: roles.OWNER || 0, TENANT: roles.TENANT || 0 }, hostels, rooms, activeStays, availableRooms, vacantCapacity, sharingSummary: [...sharingSummary.values()].sort((a, b) => a.sharingType - b.sharingType), overdueDueCount: overdue.count, overduePaise: overdue.amountPaise, recentActivity };
+  return { users: totalUsers, userRoles: { ADMIN: roles.ADMIN || 0, OWNER: roles.OWNER || 0, TENANT: roles.TENANT || 0 }, hostels, rooms, activeStays, availableRooms, vacantCapacity, sharingSummary: [...sharingSummary.values()].sort((a, b) => a.sharingType - b.sharingType), overdueDueCount: overdue.count, overduePaise: overdue.amountPaise };
 }
 
 export async function restoreRecord(admin, entityType, entityId, reason, requestId = '') {
