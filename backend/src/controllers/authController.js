@@ -19,7 +19,7 @@ function rejectOrigin(req, next) {
 function logCsrfFailure(req, reason) {
   const origin = req.get('origin');
   // TEMP: remove after production CSRF cookie delivery has been verified.
-  logger.warn({ event: 'csrf_validation_failed', reason, cookiePresent: typeof req.signedCookies?.csrf === 'string', headerPresent: Boolean(req.get('x-csrf-token')), requestId: req.id, method: req.method, route: req.path, ...(origin ? { origin: origin.slice(0, 200) } : {}), fetchSite: req.get('sec-fetch-site') });
+  logger.warn({ event: 'csrf_validation_failed', reason, cookiePresent: Object.hasOwn(req.signedCookies || {}, 'csrf'), signedCookieValid: typeof req.signedCookies?.csrf === 'string', headerPresent: Boolean(req.get('x-csrf-token')), requestId: req.id, method: req.method, route: req.path, ...(origin ? { origin: origin.slice(0, 200) } : {}), fetchSite: req.get('sec-fetch-site') });
 }
 
 export const csrfToken = (req, res, next) => {
