@@ -9,7 +9,9 @@ process.env.CLIENT_URL = 'https://haven.example.test';
 process.env.JOB_SECRET = 'csrf-flow-test-job-secret-at-least-32-characters';
 process.env.LOG_LEVEL = 'error';
 
-const { csrfToken, csrfProtection } = await import('../src/controllers/authController.js');
+const [{ csrfToken, csrfProtection }, { getCookieOptions, getClearCookieOptions }] = await Promise.all([
+  import('../src/controllers/authController.js'), import('../src/utils/cookies.js'),
+]);
 
 function request({ origin = process.env.CLIENT_URL, cookie, header } = {}) {
   return {
@@ -42,6 +44,13 @@ test('CSRF token uses a secure host-only cross-site cookie in production and mat
   assert.equal(cookie.options.sameSite, 'none');
   assert.equal(cookie.options.domain, undefined);
   assert.equal(body.data.csrfToken, cookie.value);
+  const sessionOptions = getCookieOptions();
+  assert.equal(sessionOptions.httpOnly, true);
+  assert.equal(sessionOptions.secure, true);
+  assert.equal(sessionOptions.sameSite, 'none');
+  assert.equal(sessionOptions.path, '/');
+  assert.equal(sessionOptions.maxAge, cookie.options.maxAge);
+  assert.deepEqual(getClearCookieOptions(), { httpOnly: true, secure: true, sameSite: 'none', path: '/' });
 
   const accepted = runProtection(request({ cookie: cookie.value, header: body.data.csrfToken }));
   assert.equal(accepted.error, undefined);

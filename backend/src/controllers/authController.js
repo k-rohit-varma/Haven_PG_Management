@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { sessionCookieOptions } from '../utils/cookies.js';
+import { getClearCookieOptions, getCookieOptions } from '../utils/cookies.js';
 import { env } from '../config/environment.js';
 import { AppError } from '../errors/AppError.js';
 import * as authService from '../services/authService.js';
@@ -18,13 +18,14 @@ function rejectOrigin(req, next) {
 
 function logCsrfFailure(req, reason) {
   const origin = req.get('origin');
+  // TEMP: remove after production CSRF cookie delivery has been verified.
   logger.warn({ event: 'csrf_validation_failed', reason, cookiePresent: typeof req.signedCookies?.csrf === 'string', headerPresent: Boolean(req.get('x-csrf-token')), requestId: req.id, method: req.method, route: req.path, ...(origin ? { origin: origin.slice(0, 200) } : {}), fetchSite: req.get('sec-fetch-site') });
 }
 
 export const csrfToken = (req, res, next) => {
   if (rejectOrigin(req, next)) return;
   const token = randomBytes(32).toString('hex');
-  res.cookie('csrf', token, { ...sessionCookieOptions, httpOnly: true, signed: true });
+  res.cookie('csrf', token, getCookieOptions({ signed: true }));
   res.json({ success: true, data: { csrfToken: token } });
 };
 
@@ -47,12 +48,12 @@ export function csrfProtection(req, _res, next) {
 
 export const login = asyncHandler(async (req, res) => {
   const { user, token } = await authService.login(req.body);
-  res.cookie('session', token, sessionCookieOptions);
+  res.cookie('session', token, getCookieOptions());
   res.json({ success: true, data: { user } });
 });
 
 export const logout = (_req, res) => {
-  res.clearCookie('session', { ...sessionCookieOptions, maxAge: undefined });
+  res.clearCookie('session', getClearCookieOptions());
   res.json({ success: true, data: { message: 'Signed out.' } });
 };
 
