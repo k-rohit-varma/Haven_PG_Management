@@ -1,18 +1,20 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout.jsx';
 import { useAuth } from './features/auth/AuthContext.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
-import LoginPage from './pages/LoginPage.jsx';
-import HostelsPage from './pages/HostelsPage.jsx';
-import HostelDetailPage from './pages/HostelDetailPage.jsx';
-import PaymentsPage from './pages/PaymentsPage.jsx';
-import DepositsPage from './pages/DepositsPage.jsx';
-import TenantsPage from './pages/TenantsPage.jsx';
-import TenantProfilePage from './pages/TenantProfilePage.jsx';
 import RequireAuth from './routes/RequireAuth.jsx';
-import AdminOverviewPage from './pages/AdminOverviewPage.jsx';
-import AdminPage from './pages/AdminPage.jsx';
-import AuditLogPage from './pages/AuditLogPage.jsx';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
+const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
+const HostelsPage = lazy(() => import('./pages/HostelsPage.jsx'));
+const HostelDetailPage = lazy(() => import('./pages/HostelDetailPage.jsx'));
+const PaymentsPage = lazy(() => import('./pages/PaymentsPage.jsx'));
+const DepositsPage = lazy(() => import('./pages/DepositsPage.jsx'));
+const TenantsPage = lazy(() => import('./pages/TenantsPage.jsx'));
+const TenantProfilePage = lazy(() => import('./pages/TenantProfilePage.jsx'));
+const AdminOverviewPage = lazy(() => import('./pages/AdminOverviewPage.jsx'));
+const AdminPage = lazy(() => import('./pages/AdminPage.jsx'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage.jsx'));
 
 function RootRedirect() {
   const { user } = useAuth();
@@ -20,7 +22,7 @@ function RootRedirect() {
 }
 
 export default function App() {
-  return <Routes>
+  return <Suspense fallback={<div className="loading-screen" role="status" aria-live="polite"><span className="loading-mark">haven.</span><span>Loading page…</span></div>}><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route element={<RequireAuth roles={['ADMIN', 'OWNER']} />}><Route element={<AppLayout />}>
       <Route path="/" element={<RootRedirect />} />
@@ -38,5 +40,5 @@ export default function App() {
       </Route>
     </Route></Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>;
+  </Routes></Suspense>;
 }
