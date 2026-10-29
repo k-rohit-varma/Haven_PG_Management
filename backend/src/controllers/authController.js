@@ -6,7 +6,7 @@ import { AppError } from '../errors/AppError.js';
 import * as authService from '../services/authService.js';
 import { logger } from '../utils/logger.js';
 
-const allowedClientOrigin = new URL(env.CLIENT_URL).origin || 'https://haven-pg-management-frontend.onrender.com';
+const allowedClientOrigin = new URL(env.CLIENT_URL).origin;
 
 function rejectOrigin(req, next) {
   const origin = req.get('origin');
@@ -18,7 +18,7 @@ function rejectOrigin(req, next) {
 
 function logCsrfFailure(req, reason) {
   const origin = req.get('origin');
-  logger.warn({ event: 'csrf_validation_failed', reason, requestId: req.id, method: req.method, route: req.path, ...(origin ? { origin: origin.slice(0, 200) } : {}), fetchSite: req.get('sec-fetch-site') });
+  logger.warn({ event: 'csrf_validation_failed', reason, cookiePresent: typeof req.signedCookies?.csrf === 'string', headerPresent: Boolean(req.get('x-csrf-token')), requestId: req.id, method: req.method, route: req.path, ...(origin ? { origin: origin.slice(0, 200) } : {}), fetchSite: req.get('sec-fetch-site') });
 }
 
 export const csrfToken = (req, res, next) => {

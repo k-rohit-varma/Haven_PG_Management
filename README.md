@@ -48,7 +48,7 @@ Configure `ADMIN_NAME`, `ADMIN_PHONE`, and `ADMIN_PASSWORD` in `backend/.env`. T
 
 ## Authentication and security notes
 
-The signed JWT is held in an HttpOnly cookie and is never returned in JSON. Mutating auth requests require a CSRF token fetched from `/api/v1/auth/csrf`. Production requires HTTPS and frontend/API custom domains under the same registrable domain; cookies are Secure, SameSite=Lax, and host-only. `CLIENT_URL` must exactly match the frontend origin. New tenants authenticate with their phone number; legacy email accounts remain supported. Login errors do not reveal whether the account exists. Duplicate phone registration returns a clear 409 error.
+The signed JWT is held in an HttpOnly cookie and is never returned in JSON. Mutating auth requests require a CSRF token fetched from `/api/v1/auth/csrf`. Cookies are host-only; production requires HTTPS and uses Secure/SameSite=None for cross-origin API requests, while local development uses SameSite=Lax. `CLIENT_URL` must exactly match the frontend origin. Browsers may still block third-party cookies when frontend and API use different sites; custom domains under the same registrable domain are the most reliable setup. New tenants authenticate with their phone number; legacy email accounts remain supported. Login errors do not reveal whether the account exists. Duplicate phone registration returns a clear 409 error.
 
 Authorization middleware is enforced by the API. `authorize(...roles)` is available for role-specific routes. Hostel and room ownership is scoped in service queries; tenant listing serializers exclude owner and deletion metadata. Only ADMIN can create a property and must assign an eligible owner.
 

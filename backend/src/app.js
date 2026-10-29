@@ -21,6 +21,7 @@ import { logger } from './utils/logger.js';
 
 const app = express();
 app.disable('x-powered-by');
+if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
 app.use((req, res, next) => {
   req.id = req.get('x-request-id')?.slice(0, 100) || randomUUID();
   req.startedAt = Date.now();
@@ -32,7 +33,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(helmet());
-app.use(cors({ origin: new URL('https://haven-pg-management-frontend.onrender.com'||env.CLIENT_URL).origin, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-ID'] }));
+app.use(cors({ origin: new URL(env.CLIENT_URL).origin, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-ID'], exposedHeaders: ['X-Request-ID'] }));
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser(env.COOKIE_SECRET));
 app.get('/health', health);

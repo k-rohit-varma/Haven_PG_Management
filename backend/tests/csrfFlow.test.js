@@ -29,7 +29,7 @@ function runProtection(req) {
   return { error, nextCalled };
 }
 
-test('CSRF token uses a secure host-only Lax cookie and matching header is accepted', () => {
+test('CSRF token uses a secure host-only cross-site cookie in production and matching header is accepted', () => {
   let cookie;
   let body;
   csrfToken({ get: () => process.env.CLIENT_URL }, {
@@ -39,7 +39,7 @@ test('CSRF token uses a secure host-only Lax cookie and matching header is accep
   assert.equal(cookie.options.signed, true);
   assert.equal(cookie.options.httpOnly, true);
   assert.equal(cookie.options.secure, true);
-  assert.equal(cookie.options.sameSite, 'lax');
+  assert.equal(cookie.options.sameSite, 'none');
   assert.equal(cookie.options.domain, undefined);
   assert.equal(body.data.csrfToken, cookie.value);
 
