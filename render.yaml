@@ -22,7 +22,7 @@ services:
         value: info
 staticSites:
   - name: haven-web
-    buildCommand: npm install && npm run build -w frontend
+    buildCommand: npm ci --include=dev && npm run build -w frontend
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_BASE_URL
