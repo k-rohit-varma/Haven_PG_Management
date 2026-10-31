@@ -119,8 +119,8 @@ export async function listRentDues(user, query) {
     filter.$or = [{ tenantId: { $in: tenants.map(({ _id }) => _id) } }, { roomId: { $in: roomRows.map(({ _id }) => _id) } }];
   }
   const [items, total] = await Promise.all([
-    RentDue.find(filter).sort({ dueDate: 1 }).skip((query.page - 1) * query.limit).limit(query.limit)
-      .populate('tenantId', 'name email').populate('stayId', 'agreedMonthlyRentPaise moveInDate').populate('hostelId', 'name city').populate('roomId', 'identifier').lean(),
+    RentDue.find(filter).select('_id tenantId stayId hostelId roomId billingPeriod dueDate amountDuePaise amountSettledPaise status').sort({ dueDate: 1 }).skip((query.page - 1) * query.limit).limit(query.limit)
+      .populate('tenantId', 'name').populate('hostelId', 'name').populate('roomId', 'identifier').lean(),
     RentDue.countDocuments(filter),
   ]);
   return { items: items.map((due) => ({ ...due, outstandingPaise: Math.max(0, due.amountDuePaise - due.amountSettledPaise) })), pagination: pageMeta(query.page, query.limit, total) };
@@ -233,7 +233,7 @@ export async function listPayments(user, query) {
     filter.tenantId = { $in: matchingTenants };
   }
   const [items, total] = await Promise.all([
-    Payment.find(filter).sort({ submittedAt: -1 }).skip((query.page - 1) * query.limit).limit(query.limit).populate('tenantId', 'name email').populate('rentDueId', 'billingPeriod dueDate amountDuePaise amountSettledPaise').populate('stayId', 'agreedMonthlyRentPaise').populate('hostelId', 'name city').lean(),
+    Payment.find(filter).select('_id tenantId rentDueId hostelId amountPaise paidOn method transactionReference status submittedAt decidedAt').sort({ submittedAt: -1 }).skip((query.page - 1) * query.limit).limit(query.limit).populate('tenantId', 'name').populate('rentDueId', 'billingPeriod').populate('hostelId', 'name').lean(),
     Payment.countDocuments(filter),
   ]);
   return { items, pagination: pageMeta(query.page, query.limit, total) };

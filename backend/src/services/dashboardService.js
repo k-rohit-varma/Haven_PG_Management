@@ -25,8 +25,8 @@ export async function ownerDashboard(user, query = {}) {
       _id: null,
       overdue: { $sum: { $cond: [{ $and: [{ $lt: ['$dueDate', today] }, { $gt: [{ $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] }] }, { $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] } },
     } }]),
-    RentDue.find({ hostelId: { $in: hostelIds }, ...activeStayFilter, ...monthFilter, dueDate: { $lt: today }, $expr: { $gt: [{ $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] } }).sort({ dueDate: 1 }).limit(8).populate('tenantId', 'name email').populate('roomId', 'identifier').lean(),
-    Payment.find({ hostelId: { $in: hostelIds }, ...activeStayFilter, status: { $in: ['APPROVED', 'REJECTED'] } }).sort({ decidedAt: -1 }).limit(8).populate('tenantId', 'name').populate('hostelId', 'name').lean(),
+    RentDue.find({ hostelId: { $in: hostelIds }, ...activeStayFilter, ...monthFilter, dueDate: { $lt: today }, $expr: { $gt: [{ $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] } }).select('_id tenantId roomId billingPeriod dueDate amountDuePaise amountSettledPaise').sort({ dueDate: 1 }).limit(8).populate('tenantId', 'name').populate('roomId', 'identifier').lean(),
+    Payment.find({ hostelId: { $in: hostelIds }, ...activeStayFilter, status: { $in: ['APPROVED', 'REJECTED'] } }).select('_id tenantId hostelId amountPaise status submittedAt decidedAt').sort({ decidedAt: -1 }).limit(8).populate('tenantId', 'name').populate('hostelId', 'name').lean(),
   ]);
   const roomIds = rooms.map((room) => room._id);
   const roomOccupancy = await getOccupancyByRoom(roomIds);

@@ -252,10 +252,10 @@ export async function listTenants(user, query) {
     tenantFilter.$or = [{ name: pattern }, { phone: pattern }, { email: pattern }];
   }
   const [items, total] = await Promise.all([
-    User.find(tenantFilter).select('name phone email emergencyContact notes gender isActive createdAt').sort({ name: 1, _id: 1 }).skip((query.page - 1) * query.limit).limit(query.limit).lean(),
+    User.find(tenantFilter).select('name phone email gender isActive createdAt').sort({ name: 1, _id: 1 }).skip((query.page - 1) * query.limit).limit(query.limit).lean(),
     User.countDocuments(tenantFilter),
   ]);
-  const stays = await Stay.find({ tenantId: { $in: items.map(({ _id }) => _id) }, hostelId: { $in: hostels } }).sort({ status: 1, moveInDate: -1 }).populate('hostelId', 'name city').populate('roomId', 'identifier').lean();
+  const stays = await Stay.find({ tenantId: { $in: items.map(({ _id }) => _id) }, hostelId: { $in: hostels } }).select('_id tenantId hostelId roomId status moveInDate agreedMonthlyRentPaise rentTerms securityDepositPaise').sort({ status: 1, moveInDate: -1 }).populate('hostelId', 'name city').populate('roomId', 'identifier').lean();
   const depositRows = await DepositTransaction.aggregate([
     { $match: { stayId: { $in: stays.map(({ _id }) => _id) } } },
     { $group: { _id: '$stayId', balancePaise: { $sum: { $cond: [{ $in: ['$type', ['RECEIVED', 'ADJUSTMENT_CREDIT']] }, '$amountPaise', { $multiply: ['$amountPaise', -1] }] } } } },
@@ -273,13 +273,13 @@ export async function listTenants(user, query) {
 export async function getTenant(user, tenantId) {
   const tenant = await requireTenant(user, tenantId);
   const hostels = await assignedHostels(user);
-  const stays = await Stay.find({ tenantId, hostelId: { $in: hostels } }).sort({ moveInDate: -1 }).populate('hostelId', 'name city address').populate('roomId', 'identifier sharingType maxCapacity').lean();
+  const stays = await Stay.find({ tenantId, hostelId: { $in: hostels } }).select('_id tenantId hostelId roomId status moveInDate leavingDate agreedMonthlyRentPaise rentTerms securityDepositPaise events').sort({ moveInDate: -1 }).populate('hostelId', 'name city').populate('roomId', 'identifier').lean();
   const stayIds = stays.map(({ _id }) => _id);
   const [payments, dues, deposits, audit] = await Promise.all([
-    Payment.find({ tenantId, stayId: { $in: stayIds } }).sort({ paidOn: -1 }).populate('hostelId', 'name').populate('rentDueId', 'billingPeriod dueDate').lean(),
-    RentDue.find({ tenantId, stayId: { $in: stayIds } }).sort({ dueDate: -1 }).populate('hostelId', 'name').populate('roomId', 'identifier').lean(),
-    DepositTransaction.find({ tenantId, stayId: { $in: stayIds } }).sort({ transactionDate: -1 }).populate('actorId', 'name').lean(),
-    AuditLog.find({ entityType: 'USER', entityId: tenantId }).sort({ occurredAt: -1 }).limit(100).populate('actorId', 'name').lean(),
+    Payment.find({ tenantId, stayId: { $in: stayIds } }).select('_id stayId rentDueId hostelId amountPaise paidOn method transactionReference status').sort({ paidOn: -1 }).populate('hostelId', 'name').populate('rentDueId', 'billingPeriod').lean(),
+    RentDue.find({ tenantId, stayId: { $in: stayIds } }).select('_id stayId hostelId roomId billingPeriod dueDate amountDuePaise amountSettledPaise status').sort({ dueDate: -1 }).populate('hostelId', 'name').populate('roomId', 'identifier').lean(),
+    DepositTransaction.find({ tenantId, stayId: { $in: stayIds } }).select('_id stayId transactionDate type amountPaise reason reference').sort({ transactionDate: -1 }).lean(),
+    AuditLog.find({ entityType: 'USER', entityId: tenantId }).select('_id action occurredAt actorId reason').sort({ occurredAt: -1 }).limit(100).populate('actorId', 'name').lean(),
   ]);
   const depositBalances = new Map();
   for (const item of deposits) {
