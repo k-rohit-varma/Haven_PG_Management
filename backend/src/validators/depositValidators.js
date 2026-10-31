@@ -8,7 +8,7 @@ const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }, 'Enter a valid calendar date.');
 export const depositParamsSchema = z.object({ stayId: objectId }).strict();
-export const depositQuerySchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(20) }).strict();
+export const depositQuerySchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(10) }).strict();
 export const createDepositSchema = z.object({
   type: z.enum(['RECEIVED', 'REFUND', 'DEDUCTION', 'ADJUSTMENT_CREDIT', 'ADJUSTMENT_DEBIT']),
   amountPaise: z.number().int().min(1).max(100000000), transactionDate: dateOnly,

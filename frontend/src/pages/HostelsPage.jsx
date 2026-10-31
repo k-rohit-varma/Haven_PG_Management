@@ -16,7 +16,7 @@ export default function HostelsPage() {
   const [items, setItems] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1 });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebouncedValue(searchInput.trim().length >= 2 ? searchInput.trim() : '');

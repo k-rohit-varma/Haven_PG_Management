@@ -101,6 +101,7 @@ export async function listRentDues(user, query) {
     filter.dueDate = { $lt: dateFromDay(dayInKolkata(new Date())) };
     filter.$expr = { $gt: [{ $subtract: ['$amountDuePaise', '$amountSettledPaise'] }, 0] };
   }
+  if (query.paidOnly) filter.$expr = { $gte: ['$amountSettledPaise', '$amountDuePaise'] };
   if (user.role === 'OWNER') {
     const hostels = await Hostel.find({ ...ownerScope(user), isBlocked: { $ne: true }, ...(query.hostelId ? { _id: query.hostelId } : {}) }).select('_id').lean();
     if (query.hostelId && !hostels.length) throw new AppError(404, 'Hostel not found.', 'HOSTEL_NOT_FOUND');

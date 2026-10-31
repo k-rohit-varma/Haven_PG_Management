@@ -280,12 +280,14 @@ export async function listRooms(user, hostelId, query) {
     { $facet: {
       items: [{ $sort: sort }, { $skip: (query.page - 1) * query.limit }, { $limit: query.limit }, { $project: { activeStayCounts: 0 } }],
       count: [{ $count: 'total' }],
+      summary: [{ $match: { isActive: true } }, { $group: { _id: null, count: { $sum: 1 }, occupancy: { $sum: '$occupancy' }, capacity: { $sum: '$maxCapacity' }, available: { $sum: '$availableBeds' } } }],
     } },
   ];
   const [result] = await Room.aggregate(pipeline).collation({ locale: 'en', numericOrdering: true });
   const total = result?.count?.[0]?.total || 0;
+  const summary = result?.summary?.[0] || { count: 0, occupancy: 0, capacity: 0, available: 0 };
   const items = (result?.items || []).map((room) => user.role === 'TENANT' ? publicRoom(room, room.occupancy) : room);
-  return { items, pagination: { page: query.page, limit: query.limit, total, pages: Math.ceil(total / query.limit) } };
+  return { items, summary: { count: summary.count, occupied: summary.occupancy, capacity: summary.capacity, available: summary.available }, pagination: { page: query.page, limit: query.limit, total, pages: Math.ceil(total / query.limit) } };
 }
 
 export async function createRoom(user, hostelId, input) {

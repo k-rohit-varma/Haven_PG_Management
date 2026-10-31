@@ -1,4 +1,4 @@
-export default function Pagination({ page, pages, onPageChange, total, pageSize, onPageSizeChange, pageSizes = [12, 24, 48] }) {
+export default function Pagination({ page, pages, onPageChange, total, pageSize, onPageSizeChange, pageSizes = [10, 20, 50] }) {
   if (pages <= 1 && !onPageSizeChange) return null;
   return <div className="pagination">
     {onPageSizeChange && <label className="pagination-size">Rows <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>{pageSizes.map((size) => <option value={size} key={size}>{size}</option>)}</select></label>}

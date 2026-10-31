@@ -101,10 +101,15 @@ export async function listRooms(query) {
     ...(availabilityMatch ? [{ $match: availabilityMatch }] : []),
     { $lookup: { from: 'hostels', localField: 'hostelId', foreignField: '_id', as: 'hostel' } },
     { $addFields: { hostelId: { $arrayElemAt: ['$hostel', 0] } } },
-    { $facet: { items: [{ $sort: sort }, { $skip: (query.page - 1) * query.limit }, { $limit: query.limit }, { $project: { activeStayCounts: 0, hostel: 0, 'hostelId.ownerId': 0 } }], count: [{ $count: 'total' }] } },
+    { $facet: {
+      items: [{ $sort: sort }, { $skip: (query.page - 1) * query.limit }, { $limit: query.limit }, { $project: { activeStayCounts: 0, hostel: 0, 'hostelId.ownerId': 0 } }],
+      count: [{ $count: 'total' }],
+      sharingSummary: [{ $match: { isActive: true, isDeleted: false } }, { $group: { _id: '$sharingType', totalRooms: { $sum: 1 }, totalCapacity: { $sum: '$maxCapacity' }, occupiedBeds: { $sum: '$occupancy' }, availableBeds: { $sum: '$availableBeds' } } }, { $sort: { _id: 1 } }],
+    } },
   ]).collation({ locale: 'en', numericOrdering: true });
   const total = result?.count?.[0]?.total || 0;
-  return { items: result?.items || [], pagination: pageMeta(query.page, query.limit, total) };
+  const sharingSummary = (result?.sharingSummary || []).map(({ _id, ...item }) => ({ sharingType: _id, ...item }));
+  return { items: result?.items || [], sharingSummary, summary: sharingSummary.reduce((summary, item) => ({ activeRooms: summary.activeRooms + item.totalRooms, occupiedBeds: summary.occupiedBeds + item.occupiedBeds, availableBeds: summary.availableBeds + item.availableBeds }), { activeRooms: 0, occupiedBeds: 0, availableBeds: 0 }), pagination: pageMeta(query.page, query.limit, total) };
 }
 
 export async function setUserStatus(admin, userId, input, requestId = '') {

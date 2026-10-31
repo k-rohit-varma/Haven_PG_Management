@@ -37,12 +37,12 @@ export default function HostelDetailPage() {
   const [hostel, setHostel] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [roomSummary, setRoomSummary] = useState({ count: 0, occupied: 0, capacity: 0, available: 0 });
-  const [roomPagination, setRoomPagination] = useState({ page: 1, limit: 12, pages: 1, total: 0 });
+  const [roomPagination, setRoomPagination] = useState({ page: 1, limit: 10, pages: 1, total: 0 });
   const [roomPage, setRoomPage] = useState(1);
   const [roomSearch, setRoomSearch] = useState('');
   const debouncedRoomSearch = useDebouncedValue(roomSearch.trim());
-  const [roomFilters, setRoomFilters] = useState({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' });
-  const [draftRoomFilters, setDraftRoomFilters] = useState({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' });
+  const [roomFilters, setRoomFilters] = useState({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '10' });
+  const [draftRoomFilters, setDraftRoomFilters] = useState({ genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '10' });
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [roomsError, setRoomsError] = useState('');
   const roomRequestSequence = useRef(0);
@@ -68,7 +68,6 @@ export default function HostelDetailPage() {
     try {
       const { data } = await api.get(`/hostels/${hostelId}`);
       setHostel(data.data.hostel);
-      setRoomSummary(data.data.roomSummary || { count: 0, occupied: 0, capacity: 0, available: 0 });
     } catch (requestError) { setError(getErrorMessage(requestError)); }
     finally { setLoading(false); }
   }, [hostelId]);
@@ -85,7 +84,7 @@ export default function HostelDetailPage() {
     if (roomFilters.maxRent !== '') params.maxRentPaise = Math.round(Number(roomFilters.maxRent) * 100);
     try {
       const { data } = await api.get(`/hostels/${hostelId}/rooms`, { params });
-      if (sequence === roomRequestSequence.current) { setRooms(data.data.items); setRoomPagination(data.data.pagination); }
+      if (sequence === roomRequestSequence.current) { setRooms(data.data.items); setRoomPagination(data.data.pagination); if (data.data.summary) setRoomSummary(data.data.summary); }
     } catch (requestError) { if (sequence === roomRequestSequence.current) setRoomsError(getErrorMessage(requestError)); }
     finally { if (sequence === roomRequestSequence.current) setRoomsLoading(false); }
   }, [debouncedRoomSearch, hostelId, roomFilters, roomPage]);
@@ -195,7 +194,7 @@ export default function HostelDetailPage() {
     }
   }
   function applyRoomFilters() { setRoomPage(1); setRoomFilters((current) => ({ ...current, ...draftRoomFilters })); }
-  function clearRoomFilters() { const empty = { genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '12' }; setRoomSearch(''); setRoomPage(1); setDraftRoomFilters(empty); setRoomFilters(empty); }
+  function clearRoomFilters() { const empty = { genderEligibility: '', sharingType: '', minCapacity: '', maxCapacity: '', availability: '', active: '', minRent: '', maxRent: '', minAvailableBeds: '', sortBy: 'identifier_asc', limit: '10' }; setRoomSearch(''); setRoomPage(1); setDraftRoomFilters(empty); setRoomFilters(empty); }
   return <div className="feature-page"><Link to="/hostels" className="back-link"><ArrowLeft size={15} />Properties</Link>
     <div className="detail-hero"><span className="detail-icon"><Building2 size={23} /></span><div className="detail-title"><span className="eyebrow">{hostel.accommodationPolicy.replaceAll('_', ' ')} · {hostel.isBlocked ? 'BLOCKED' : hostel.isActive ? 'ACTIVE LISTING' : 'INACTIVE LISTING'}</span><h1>{hostel.name}</h1><p><MapPin size={14} />{hostel.address}, {hostel.city}</p>{hostel.isBlocked && <p className="feature-error">Blocked: {hostel.blockReason || 'Access is disabled for the owner and tenants.'}</p>}</div>{canManage && <div className="detail-actions"><button className="button button-secondary" onClick={openEditHostel}><Pencil size={15} />Edit property</button>{user?.role === 'ADMIN' && <button className={hostel.isBlocked ? 'button button-primary' : 'button button-danger'} onClick={toggleBlock}><ShieldAlert size={15} />{hostel.isBlocked ? 'Unblock hostel' : 'Block hostel'}</button>}</div>}</div>
     {hostel.facilities?.length > 0 && <div className="facility-chips">{hostel.facilities.map((facility) => <span key={facility}>{facility}</span>)}</div>}
@@ -217,7 +216,7 @@ export default function HostelDetailPage() {
     <div className="room-results-count">{roomPagination.total} matching {roomPagination.total === 1 ? 'room' : 'rooms'}</div>
     {roomsError && <div className="feature-error" role="alert">{roomsError}<button onClick={loadRooms}>Try again</button></div>}
     {roomsLoading ? <div className="feature-loading">Loading rooms…</div> : rooms.length ? <div className="room-grid">{rooms.map((room) => <article className="room-card" key={room._id}><div className="room-card-head"><span className="room-icon"><BedDouble size={18} /></span><span className={`room-eligibility eligibility-${room.genderEligibility || 'unknown'}`}>{eligibilityLabel(room.genderEligibility)}</span>{room.isActive === false && <span className="room-eligibility room-inactive">Inactive</span>}{canManage && <span className="room-card-actions"><button aria-label={`Edit room ${room.identifier}`} onClick={() => openEditRoom(room)}><Pencil size={14} /></button><button aria-label={`View room ${room.identifier} history`} onClick={() => showHistory(room)}><History size={14} /></button></span>}</div><h3>Room {room.identifier}</h3><p>{room.sharingType}-sharing · {room.maxCapacity} bed capacity</p><div className="room-card-foot"><span>{room.occupancy} occupied · {room.availableBeds} available</span><b>{money(room.defaultRentPaise)}<small> / bed / month</small></b></div><div className="room-actions"><button className="button button-secondary" onClick={() => showRoomDetails(room)}>Room details</button>{canManage && <button className="button button-secondary" disabled={room.availableBeds < 1 || room.isActive === false} onClick={() => navigate('/applications', { state: { hostelId, roomId: room._id } })}>Assign Tenant</button>}</div></article>)}</div> : <div className="feature-empty compact-empty"><span className="empty-icon"><BedDouble size={19} /></span><h2>{roomPagination.total ? 'No rooms match these filters' : 'No rooms configured'}</h2><p>{roomPagination.total ? 'Adjust or clear the selected filters.' : 'Add rooms to track capacity and default monthly rent.'}</p>{roomPagination.total > 0 && <button className="button button-secondary" onClick={clearRoomFilters}>Clear filters</button>}</div>}
-    {!roomsLoading && <Pagination page={roomPage} pages={roomPagination.pages || 1} total={roomPagination.total} pageSize={Number(roomFilters.limit)} pageSizes={[6, 12, 24, 48]} onPageChange={setRoomPage} onPageSizeChange={(size) => { const limit = String(size); setRoomPage(1); setDraftRoomFilters((current) => ({ ...current, limit })); setRoomFilters((current) => ({ ...current, limit })); }} />}
+    {!roomsLoading && <Pagination page={roomPage} pages={roomPagination.pages || 1} total={roomPagination.total} pageSize={Number(roomFilters.limit)} pageSizes={[10, 20, 50]} onPageChange={setRoomPage} onPageSizeChange={(size) => { const limit = String(size); setRoomPage(1); setDraftRoomFilters((current) => ({ ...current, limit })); setRoomFilters((current) => ({ ...current, limit })); }} />}
     {dialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialogOpen(false); }}><section className="form-dialog" role="dialog" aria-modal="true" aria-labelledby="create-room-title"><button className="dialog-close" aria-label="Close dialog" onClick={() => setDialogOpen(false)}>×</button><span className="eyebrow">ROOM INVENTORY</span><h2 id="create-room-title">{editingRoom ? `Edit room ${editingRoom.identifier}` : 'Add a room'}</h2><p>Default rent applies to future stays. Existing agreements are unchanged.</p><form onSubmit={handleSubmit(saveRoom)} className="stacked-form">
       <label>Room number<input {...register('identifier')} placeholder="e.g. 101" />{errors.identifier && <small>{errors.identifier.message}</small>}</label>
       <div className="form-columns"><label>Sharing type<select {...register('sharingType', { onChange: (event) => { const selectedSharing = Number(event.target.value); if (Number(getValues('maxCapacity')) < selectedSharing) setValue('maxCapacity', selectedSharing, { shouldDirty: true, shouldValidate: true }); } })}>{Array.from({ length: 20 }, (_, index) => index + 1).map((n) => <option key={n} value={n}>{n === 1 ? 'Single' : `${n}-sharing`}</option>)}</select></label><label>Bed capacity<input {...register('maxCapacity')} type="number" min="1" max="20" />{errors.maxCapacity && <small>{errors.maxCapacity.message}</small>}</label></div>

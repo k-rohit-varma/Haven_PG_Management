@@ -41,7 +41,7 @@ export const updateRoomSchema = z.object({
 }).strict().refine((value) => Object.keys(value).some((key) => key !== 'reason'), 'Provide at least one field to update.');
 
 export const listQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(20),
+  page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(10),
   city: z.string().trim().max(100).optional(), search: z.string().trim().max(100).optional(),
   active: z.enum(['true', 'false']).optional(),
 }).strict();

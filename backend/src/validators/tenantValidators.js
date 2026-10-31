@@ -14,7 +14,7 @@ const phone = z.string().trim().transform((value, ctx) => {
   return normalized;
 });
 const email = z.union([z.literal(''), z.string().trim().email().max(254)]).optional().transform((value) => value ? value.toLowerCase() : undefined);
-const pageFields = { page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(24) };
+const pageFields = { page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(10) };
 
 export const tenantListQuery = z.object({
   ...pageFields, search: z.string().trim().max(100).optional(), hostelId: objectId.optional(), roomId: objectId.optional(),

@@ -7,7 +7,7 @@ const date = (value) => new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', 
 
 export default function AuditLogPage() {
   const [filters, setFilters] = useState({ action: '', entityType: '', actorId: '', from: '', to: '' }); const [applied, setApplied] = useState(filters);
-  const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(20); const [data, setData] = useState({ items: [], pagination: { pages: 1, total: 0 } }); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(10); const [data, setData] = useState({ items: [], pagination: { pages: 1, total: 0 } }); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const requestSequence = useRef(0);
   const load = useCallback(async () => { const sequence = ++requestSequence.current; setLoading(true); setError(''); try { const params = { page, limit: pageSize, ...applied }; if (params.from) params.from = `${params.from}T00:00:00.000Z`; if (params.to) params.to = `${params.to}T23:59:59.999Z`; Object.keys(params).forEach((key) => { if (!params[key]) delete params[key]; }); const { data: response } = await api.get('/admin/audit-logs', { params }); if (sequence === requestSequence.current) setData(response.data); } catch (e) { if (sequence === requestSequence.current) setError(getErrorMessage(e)); } finally { if (sequence === requestSequence.current) setLoading(false); } }, [page, pageSize, applied]);
   useEffect(() => { load(); }, [load]);

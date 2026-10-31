@@ -24,7 +24,7 @@ export default function TenantsPage() {
   const [filterRooms, setFilterRooms] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(24);
+  const [pageSize, setPageSize] = useState(10);
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebouncedValue(searchInput.trim());
   const [search, setSearch] = useState('');
